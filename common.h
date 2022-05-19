@@ -175,8 +175,10 @@ cudnnDataType_t ToCudnnDataType(int data_type) {
   switch (data_type) {
     case 0:
       dtype = CUDNN_DATA_FLOAT;
+      break;
     case 1:
       dtype = CUDNN_DATA_HALF;
+      break;
   }
   return dtype;
 }
@@ -186,8 +188,10 @@ int GetConvAccumulatorType(int data_type) {
   switch (data_type) {
     case 0:
       dtype = 0;
+      break;
     case 1:
       dtype = 0;
+      break;
   }
   return dtype;
 }
