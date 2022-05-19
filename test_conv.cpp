@@ -4,7 +4,7 @@
 
 #include "cmd_options.h"
 #include "common.h"
-#include "convolution_unfused.h"
+#include "graph_conv.h"
 #include "utils.h"
 
 int main(int argc, char** argv) {
