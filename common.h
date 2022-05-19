@@ -1,4 +1,5 @@
 #include <cudnn.h>
+
 #include <functional>
 
 #define checkCUDA(expression)                               \
@@ -37,11 +38,11 @@
 #define RETURN_MSG_IF_CUDNN_ERROR(expr)                                 \
   do {                                                                  \
     cudnnStatus_t _status = (expr).get_status();                        \
-    if (!(_status == CUDNN_STATUS_SUCCESS)) {            \
+    if (!(_status == CUDNN_STATUS_SUCCESS)) {                           \
       std::ostringstream oss;                                           \
       oss << CudnnStatusToString(_status) << "\nin " << __FILE__ << "(" \
           << __LINE__ << "): '" << #expr << "' " << (expr).get_error(); \
-      return {};             \
+      return {};                                                        \
     }                                                                   \
   } while (false)
 
@@ -76,4 +77,3 @@ struct ConvOpts {
     return total;
   }
 };
-

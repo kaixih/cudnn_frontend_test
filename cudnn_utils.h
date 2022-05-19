@@ -118,5 +118,3 @@ int GetConvAccumulatorType(int data_type) {
   }
   return dtype;
 }
-
-

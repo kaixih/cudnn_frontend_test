@@ -147,7 +147,7 @@ void CreateOpRunners(
       return;
     }
   }
-  std::cout << "Filtered engine configs size: " << filtered_configs.size()
+  std::cout << "\nFiltered engine configs size: " << filtered_configs.size()
             << std::endl;
 
   auto fn = []() { return true; };
@@ -195,10 +195,10 @@ void CreateOpRunners(
             << std::endl;
 }
 
-template<typename... Args>
+template <typename... Args>
 struct LaunchRunner {
   void operator()(cudnnHandle_t& cudnn, cudnnBackendDescriptor_t& plan_desc,
-      void* ws_ptr, const int64_t* uids, Args... args) {
+                  void* ws_ptr, const int64_t* uids, Args... args) {
     std::array<void*, sizeof...(Args)> data_ptrs = {args...};
     auto variantPack = cudnn_frontend::VariantPackBuilder()
                            .setWorkspacePointer(ws_ptr)
@@ -207,7 +207,8 @@ struct LaunchRunner {
                            .build();
     checkCUDNN(variantPack.get_status());
 
-    auto ret = cudnnBackendExecute(cudnn, plan_desc, variantPack.get_raw_desc());
+    auto ret =
+        cudnnBackendExecute(cudnn, plan_desc, variantPack.get_raw_desc());
     checkCUDNN(ret);
   }
 };

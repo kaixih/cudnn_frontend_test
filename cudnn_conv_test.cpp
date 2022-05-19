@@ -1,11 +1,11 @@
 #include <cuda_fp16.h>
+
 #include <iostream>
 
 #include "cmd_options.h"
 #include "common.h"
 #include "convolution_unfused.h"
 #include "utils.h"
-
 
 int main(int argc, char** argv) {
   ASSIGN_OR_RETURN(auto opts, ParseConvOpts(argc, argv),
