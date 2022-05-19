@@ -51,9 +51,11 @@ struct ConvOpts {
   int64_t input_dims[5];
   int64_t filter_dims[5];
   int64_t output_dims[5];
+  int64_t bias_dims[5];
   int64_t input_strides[5];
   int64_t filter_strides[5];
   int64_t output_strides[5];
+  int64_t bias_strides[5];
   int64_t paddings[3];
   int64_t strides[3];
   int64_t dilations[3];
@@ -74,6 +76,11 @@ struct ConvOpts {
   int64_t filter_size() {
     int64_t total = filter_dims[0];
     for (int i = 1; i < num_dims + 2; i++) total *= filter_dims[i];
+    return total;
+  }
+  int64_t bias_size() {
+    int64_t total = bias_dims[0];
+    for (int i = 1; i < num_dims + 2; i++) total *= bias_dims[i];
     return total;
   }
 };

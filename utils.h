@@ -66,6 +66,7 @@ std::optional<ConvOpts> ParseConvOpts(int argc, char** argv) {
   struct CmdConvOpts {
     std::string input_dims = "3,4,5,5";
     std::string filter_dims = "4,4,2,2,2";
+    std::string bias_dims = "0,0,0";
     std::string paddings = "1,1,1";
     std::string strides = "1,1,1";
     std::string dilations = "1,1,1";
@@ -76,6 +77,7 @@ std::optional<ConvOpts> ParseConvOpts(int argc, char** argv) {
   auto parser = CmdOpts<CmdConvOpts>::Create(
       {{"--input", &CmdConvOpts::input_dims},
        {"--filter", &CmdConvOpts::filter_dims},
+       {"--bias", &CmdConvOpts::bias_dims},
        {"--stride", &CmdConvOpts::strides},
        {"--padding", &CmdConvOpts::paddings},
        {"--dilation", &CmdConvOpts::dilations},
@@ -115,6 +117,7 @@ std::optional<ConvOpts> ParseConvOpts(int argc, char** argv) {
   // We use "input_dims" to determine the convolution dim, i.e. 2D or 3D.
   str2int_parser(parsed_opts.input_dims, opts.input_dims, true);
   str2int_parser(parsed_opts.filter_dims, opts.filter_dims);
+  str2int_parser(parsed_opts.bias_dims, opts.bias_dims);
   str2int_parser(parsed_opts.strides, opts.strides);
   str2int_parser(parsed_opts.paddings, opts.paddings);
   str2int_parser(parsed_opts.dilations, opts.dilations);
@@ -151,6 +154,7 @@ void PrintConvOpts(ConvOpts& opts) {
   print_ints(&opts.num_dims, 1, "num_dims");
   print_ints(opts.input_dims, opts.num_dims + 2, "input_dims");
   print_ints(opts.filter_dims, opts.num_dims + 2, "filter_dims");
+  print_ints(opts.bias_dims, opts.num_dims + 2, "bias_dims");
   print_ints(opts.output_dims, opts.num_dims + 2, "output_dims");
   print_ints(opts.input_strides, opts.num_dims + 2, "input_strides");
   print_ints(opts.filter_strides, opts.num_dims + 2, "filter_strides");

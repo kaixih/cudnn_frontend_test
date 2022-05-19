@@ -4,7 +4,7 @@
 
 #include "cmd_options.h"
 #include "common.h"
-#include "graph_conv.h"
+#include "graph_fused_conv.h"
 #include "utils.h"
 
 int main(int argc, char** argv) {
@@ -16,11 +16,16 @@ int main(int argc, char** argv) {
     print_on = true;
   }
 
+  if (opts.bias_size() == 0) {
+    std::cout << "--bias_dims has to be provided in this test!" << std::endl;
+    std::exit(EXIT_FAILURE);
+  }
+
   PrintConvOpts(opts);
 
   cudnnHandle_t cudnn = nullptr;
   checkCUDNN(cudnnCreate(&cudnn));
-  ASSIGN_OR_RETURN(auto op_graph, GetUnfusedConvGraph(opts, cudnn),
+  ASSIGN_OR_RETURN(auto op_graph, GetFusedConvGraph(opts, cudnn),
                    "Failed to build the conv graph.");
   std::vector<std::unique_ptr<cudnn_frontend::ExecutionPlan>> plans;
   CreateOpRunners(cudnn, std::move(op_graph), &plans);
@@ -37,6 +42,7 @@ int main(int argc, char** argv) {
 
   void* x_ptr;
   void* f_ptr;
+  void* b_ptr;
   void* y_ptr;
   void (*init_fn)(void** d_ptr, size_t n, std::function<float()> init_fn);
   void (*print_fn)(void* d_ptr, size_t n, const std::string& prompt);
@@ -50,23 +56,22 @@ int main(int argc, char** argv) {
 
   init_fn(&x_ptr, opts.input_size(), InitRandoms);
   init_fn(&f_ptr, opts.filter_size(), InitRandoms);
+  init_fn(&b_ptr, opts.bias_size(), InitRandoms);
   init_fn(&y_ptr, opts.output_size(), InitRandoms);
 
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {
     print_fn(x_ptr, opts.input_size(), "### Input Before:");
     print_fn(f_ptr, opts.filter_size(), "### Filter Before:");
-    print_fn(y_ptr, opts.output_size(), "### Output Before:");
+    print_fn(b_ptr, opts.bias_size(), "### Bias Before:");
   }
 
-  int64_t uids[] = {'x', 'y', 'w'};
-  auto launcher = LaunchRunner<void*, void*, void*>();
-  launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, y_ptr, f_ptr);
+  int64_t uids[] = {'x', 'w', 'z', 'b', 'y'};
+  auto launcher = LaunchRunner<void*, void*, void*, void*, void*>();
+  launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, y_ptr, b_ptr, y_ptr);
 
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {
-    print_fn(x_ptr, opts.input_size(), "### Input After:");
-    print_fn(f_ptr, opts.filter_size(), "### Filter After:");
     print_fn(y_ptr, opts.output_size(), "### Output After:");
   }
   std::cout << ">>> Convolution Finished." << std::endl;

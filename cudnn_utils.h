@@ -118,3 +118,16 @@ int GetConvAccumulatorType(int data_type) {
   }
   return dtype;
 }
+
+int GetConvActivationType(int data_type) {
+  int dtype;
+  switch (data_type) {
+    case 0:
+      dtype = 0;
+      break;
+    case 1:
+      dtype = 0;
+      break;
+  }
+  return dtype;
+}
