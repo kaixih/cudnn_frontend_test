@@ -66,7 +66,7 @@ std::optional<ConvOpts> ParseConvOpts(int argc, char** argv) {
   struct CmdConvOpts {
     std::string input_dims = "3,4,5,5";
     std::string filter_dims = "4,4,2,2,2";
-    std::string bias_dims = "0,0,0";
+    std::string bias_dims = "0,0,0,0,0";
     std::string paddings = "1,1,1";
     std::string strides = "1,1,1";
     std::string dilations = "1,1,1";
