@@ -1,6 +1,6 @@
 #include <cudnn.h>
 
-#include <functional>
+#include <numeric>
 
 #define checkCUDA(expression)                               \
   {                                                         \
@@ -64,23 +64,19 @@ struct ConvOpts {
   int64_t conv_kind;
 
   int64_t input_size() {
-    int64_t total = input_dims[0];
-    for (int i = 1; i < num_dims + 2; i++) total *= input_dims[i];
-    return total;
+    return std::accumulate(input_dims, input_dims + num_dims + 2, 1,
+                           std::multiplies<int64_t>());
   }
   int64_t output_size() {
-    int64_t total = output_dims[0];
-    for (int i = 1; i < num_dims + 2; i++) total *= output_dims[i];
-    return total;
+    return std::accumulate(output_dims, output_dims + num_dims + 2, 1,
+                           std::multiplies<int64_t>());
   }
   int64_t filter_size() {
-    int64_t total = filter_dims[0];
-    for (int i = 1; i < num_dims + 2; i++) total *= filter_dims[i];
-    return total;
+    return std::accumulate(filter_dims, filter_dims + num_dims + 2, 1,
+                           std::multiplies<int64_t>());
   }
   int64_t bias_size() {
-    int64_t total = bias_dims[0];
-    for (int i = 1; i < num_dims + 2; i++) total *= bias_dims[i];
-    return total;
+    return std::accumulate(bias_dims, bias_dims + num_dims + 2, 1,
+                           std::multiplies<int64_t>());
   }
 };
