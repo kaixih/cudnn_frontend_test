@@ -60,4 +60,3 @@ GetUnfusedConvGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
   return std::unique_ptr<cudnn_frontend::OperationGraph>(
       new cudnn_frontend::OperationGraph(std::move(opGraph)));
 }
-
