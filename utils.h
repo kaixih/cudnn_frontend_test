@@ -158,6 +158,7 @@ void PrintConvOpts(ConvOpts& opts) {
   print_ints(opts.output_dims, opts.num_dims + 2, "output_dims");
   print_ints(opts.input_strides, opts.num_dims + 2, "input_strides");
   print_ints(opts.filter_strides, opts.num_dims + 2, "filter_strides");
+  print_ints(opts.bias_strides, opts.num_dims + 2, "bias_strides");
   print_ints(opts.output_strides, opts.num_dims + 2, "output_strides");
   print_ints(opts.paddings, opts.num_dims, "paddings");
   print_ints(opts.strides, opts.num_dims, "strides");
