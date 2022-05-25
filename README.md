@@ -4,8 +4,8 @@ define an operation graph and input it to CuDNN which will try to fuse it
 and look for efficient kernels to execute the graph.
 
 However, using such APIs involves many boilerplate codes and also requires the
-understanding of the heuristics, since not all the engines meet our requirements on
-precision/determinism/etc. A typical procedure is like:
+understanding of the heuristics, since not all the engines meet our requirements
+on precision/determinism/etc. A typical procedure is like:
 
 1. Define the operation graph.
 1. Obtain the list of heuristics engines.
@@ -20,11 +20,13 @@ that we've used in the Tensorflow and puts those reusable parts into callable
 templates/functions. Then, hopefully, users can easily add new case to use the
 new graph added by CuDNN.
 
-At this point, the step 1 is defined in `graph_<graph_name>.h` and the step 4 is
-defined in `test_<graph_name>.cpp`. Supported graph names:
+The step 1 is defined in `graph_<graph_name>.h` and the step 4 is defined in
+`test_<graph_name>.cpp`. For new patterns, users can simply modify these two
+files. This repo already includes these patterns:
 
-* `<conv>`: Conv
-* `<fused_conv>`: Conv->Add->BiasAdd->Relu
+* `<conv>`: Conv (Precompiled Single Operation Engine)
+* `<conv_add_bias_relu>`: Conv->Add->BiasAdd->Relu (Precompiled Specialized Engine)
+* `<conv_bias_elu>`: Conv->BiasAdd->Elu (Runtime Fusion Engine)
 
 
 # Usage
@@ -86,7 +88,7 @@ For *the fused convolution graph*, we simply change the target to
 required for the test. For example, we can see the `ConvFwd_Add_Add_ReluFwd`
 engines are returned when we add `--bias` option.
 ```
-$ ./test_fused_conv.out --input 8,64,128,128,128 --filter 32,64,3,3,3 \
+$ ./test_conv_add_bias_relu.out --input 8,64,128,128,128 --filter 32,64,3,3,3 \
   --bias 1,32,1,1,1 --data_format 1 --data_type 1 --engine_index 0
 >>> CONVOLUTION:
 >>>   num_dims: 3,
