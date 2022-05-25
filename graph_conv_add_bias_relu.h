@@ -3,14 +3,14 @@
 #include "cudnn_frontend_utils.h"
 
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
-GetFusedConvGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
+GetConvAddBiasReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
   // CUDNN fused operation supports the pattern in the form of
-  // Conv + Add + BiasAdd + Act. Therefore, we need to build a graph of the
+  // Conv + Add + BiasAdd + Relu. Therefore, we need to build a graph of the
   // four ops with their input/output tensor edges:
   // Conv   : input: tensor_x, tensor_w;    output: tensor_conv (virtual)
   // Add    : input: tensor_conv, tensor_z; output: tensor_add (virtual)
   // BiasAdd: input: tensor_add, tensor_b;  output: tensor_bias (virtual)
-  // Act    : input: tensor_bias;           output: tensor_y
+  // Relu   : input: tensor_bias;           output: tensor_y
 
   ASSIGN_OR_RETURN(auto tensor_x,
                    CreateCudnnTensor(opts.input_dims, opts.input_strides,

@@ -4,7 +4,7 @@
 
 #include "cmd_options.h"
 #include "common.h"
-#include "graph_fused_conv.h"
+#include "graph_conv_add_bias_relu.h"
 #include "utils.h"
 
 int main(int argc, char** argv) {
@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
 
   cudnnHandle_t cudnn = nullptr;
   checkCUDNN(cudnnCreate(&cudnn));
-  ASSIGN_OR_RETURN(auto op_graph, GetFusedConvGraph(opts, cudnn),
+  ASSIGN_OR_RETURN(auto op_graph, GetConvAddBiasReluGraph(opts, cudnn),
                    "Failed to build the conv graph.");
   std::vector<std::unique_ptr<cudnn_frontend::ExecutionPlan>> plans;
   CreateOpRunners(cudnn, std::move(op_graph), &plans);
