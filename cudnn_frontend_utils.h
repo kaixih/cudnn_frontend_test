@@ -137,16 +137,12 @@ void CreateOpRunners(
                                /*disable_tensor_core*/ false);
   };
 
+  // The runtime fusion engines will always be in the "heuristics_fallback". To
+  // avoid early-exit, we set the evaluate_all to true. 
   std::vector<cudnnStatus_t> heuristics_statuses =
       cudnn_frontend::get_heuristics_list<2>(
           {"heuristics_mode_b", "heuristics_fallback"}, *op_graph,
-          generic_filter_fn, filtered_configs);
-  for (auto& status : heuristics_statuses) {
-    if (!status == CUDNN_STATUS_SUCCESS) {
-      std::cout << "!!! cuDNN's get_heuristics_list error." << std::endl;
-      return;
-    }
-  }
+          generic_filter_fn, filtered_configs, /*evaluate_all=*/true);
   std::cout << "\nFiltered engine configs size: " << filtered_configs.size()
             << std::endl;
 
