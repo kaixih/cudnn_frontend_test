@@ -3,7 +3,7 @@ void InitDeviceTensor(void** d_ptr, size_t n, std::function<float()> init_fn) {
   checkCUDA(cudaMalloc(d_ptr, n * sizeof(T)));
   T* h_ptr = new T[n];
   for (size_t i = 0; i < n; i++) {
-    h_ptr[i] = init_fn();
+    h_ptr[i] = static_cast<T>(init_fn());
   }
   checkCUDA(cudaMemcpy(*d_ptr, h_ptr, sizeof(T) * n, cudaMemcpyHostToDevice));
   delete[] h_ptr;
@@ -60,6 +60,7 @@ void ComputeStrides(ConvOpts& opts, int data_format) {
   compute_strides(opts.input_dims, opts.input_strides);
   compute_strides(opts.filter_dims, opts.filter_strides);
   compute_strides(opts.output_dims, opts.output_strides);
+  compute_strides(opts.bias_dims, opts.bias_strides);
 }
 
 std::optional<ConvOpts> ParseConvOpts(int argc, char** argv) {
