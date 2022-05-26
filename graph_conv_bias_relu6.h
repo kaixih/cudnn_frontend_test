@@ -9,8 +9,8 @@ GetConvBiasRelu6Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
   // four ops with their input/output tensor edges:
   // Conv   : input: tensor_x, tensor_w;       output: tensor_conv (virtual)
   // BiasAdd: input: tensor_conv, tensor_b;    output: tensor_bias (virtual)
-  // MIN    : input: tensor_bias, tensor_zero; output: tensor_min (virtual)
-  // MAX    : input: tensor_min, tensor_six;   output: tensor_y
+  // MAX    : input: tensor_bias, tensor_zero; output: tensor_max (virtual)
+  // MIN    : input: tensor_max, tensor_six;   output: tensor_y
 
   ASSIGN_OR_RETURN(auto tensor_x,
                    CreateCudnnTensor(opts.input_dims, opts.input_strides,
@@ -56,11 +56,11 @@ GetConvBiasRelu6Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
                                      opts.num_dims + 2, 'B', activation_type,
                                      /*is_virtual=*/true),
                    "Failed to build tensor bias");
-  ASSIGN_OR_RETURN(auto tensor_min,
+  ASSIGN_OR_RETURN(auto tensor_max,
                    CreateCudnnTensor(opts.output_dims, opts.output_strides,
                                      opts.num_dims + 2, 'M', activation_type,
                                      /*is_virtual=*/true),
-                   "Failed to build tensor min");
+                   "Failed to build tensor max");
 
   auto conv_mode = CUDNN_CROSS_CORRELATION;
   int conv_dim = opts.num_dims;
@@ -105,21 +105,6 @@ GetConvBiasRelu6Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
                          .build();
   RETURN_MSG_IF_CUDNN_ERROR(bias_add_op);
 
-  auto min_desc = cudnn_frontend::PointWiseDescBuilder()
-                      .setMode(CUDNN_POINTWISE_MIN)
-                      .setMathPrecision(cudnn_activation_type)
-                      .build();
-  RETURN_MSG_IF_CUDNN_ERROR(min_desc);
-
-  auto min_op = cudnn_frontend::OperationBuilder(
-                    CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                    .setxDesc(bias_add_op.getOutputTensor())
-                    .setbDesc(scalar_tensor_zero)
-                    .setyDesc(tensor_min)
-                    .setpwDesc(min_desc)
-                    .build();
-  RETURN_MSG_IF_CUDNN_ERROR(min_op);
-
   auto max_desc = cudnn_frontend::PointWiseDescBuilder()
                       .setMode(CUDNN_POINTWISE_MAX)
                       .setMathPrecision(cudnn_activation_type)
@@ -128,16 +113,31 @@ GetConvBiasRelu6Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   auto max_op = cudnn_frontend::OperationBuilder(
                     CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                    .setxDesc(min_op.getOutputTensor())
-                    .setbDesc(scalar_tensor_six)
-                    .setyDesc(tensor_y)
+                    .setxDesc(bias_add_op.getOutputTensor())
+                    .setbDesc(scalar_tensor_zero)
+                    .setyDesc(tensor_max)
                     .setpwDesc(max_desc)
                     .build();
   RETURN_MSG_IF_CUDNN_ERROR(max_op);
 
+  auto min_desc = cudnn_frontend::PointWiseDescBuilder()
+                      .setMode(CUDNN_POINTWISE_MIN)
+                      .setMathPrecision(cudnn_activation_type)
+                      .build();
+  RETURN_MSG_IF_CUDNN_ERROR(min_desc);
+
+  auto min_op = cudnn_frontend::OperationBuilder(
+                    CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
+                    .setxDesc(max_op.getOutputTensor())
+                    .setbDesc(scalar_tensor_six)
+                    .setyDesc(tensor_y)
+                    .setpwDesc(min_desc)
+                    .build();
+  RETURN_MSG_IF_CUDNN_ERROR(min_op);
+
 
   std::array<cudnn_frontend::Operation const*, 4> ops = {&conv_op, &bias_add_op,
-                                                         &min_op, &max_op};
+                                                         &max_op, &min_op};
 
   auto op_graph = cudnn_frontend::OperationGraphBuilder()
                       .setHandle(cudnn)
