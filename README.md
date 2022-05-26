@@ -28,6 +28,7 @@ files. This repo already includes these patterns:
 * `<conv_add_bias_relu>`: Conv->Add->BiasAdd->Relu (Precompiled Specialized Engine)
 * `<conv_bias_elu>`: Conv->BiasAdd->Elu (Runtime Fusion Engine)
 * `<conv_bias_relu6>`: Conv->BiasAdd->Relu6 (Runtime Fusion Engine)
+* `<conv_bias_leakyrelu>`: Conv->BiasAdd->LeakyRelu (Runtime Fusion Engine)
 
 
 # Usage
