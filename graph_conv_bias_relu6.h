@@ -128,7 +128,7 @@ GetConvBiasRelu6Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   auto max_op = cudnn_frontend::OperationBuilder(
                     CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                    .setxDesc(bias_add_op.getOutputTensor())
+                    .setxDesc(min_op.getOutputTensor())
                     .setbDesc(scalar_tensor_six)
                     .setyDesc(tensor_y)
                     .setpwDesc(max_desc)
