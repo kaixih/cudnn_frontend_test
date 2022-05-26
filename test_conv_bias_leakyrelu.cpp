@@ -50,7 +50,6 @@ int main(int argc, char** argv) {
   void* f_ptr;
   void* b_ptr;
   void* y_ptr;
-  void* zero_ptr;
   void* alpha_ptr;
   void (*init_fn)(void** d_ptr, size_t n, std::function<float()> init_fn);
   void (*print_fn)(void* d_ptr, size_t n, const std::string& prompt);
@@ -66,7 +65,6 @@ int main(int argc, char** argv) {
   init_fn(&f_ptr, opts.filter_size(), InitRandoms);
   init_fn(&b_ptr, opts.bias_size(), InitRandoms);
   init_fn(&y_ptr, opts.output_size(), InitRandoms);
-  init_fn(&zero_ptr, 1, [](){ return 0.f; });
   init_fn(&alpha_ptr, 1, [](){ return 0.3f; });
 
   checkCUDA(cudaDeviceSynchronize());
@@ -74,13 +72,12 @@ int main(int argc, char** argv) {
     print_fn(x_ptr, opts.input_size(), "### Input Before:");
     print_fn(f_ptr, opts.filter_size(), "### Filter Before:");
     print_fn(b_ptr, opts.bias_size(), "### Bias Before:");
-    print_fn(zero_ptr, 1, "### Zero Before:");
     print_fn(alpha_ptr, 1, "### Alpha Before:");
   }
 
-  int64_t uids[] = {'x', 'w', 'b', 'y', '0', 'a'};
-  auto launcher = LaunchRunner<void*, void*, void*, void*, void*, void*>();
-  launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr, zero_ptr,
+  int64_t uids[] = {'x', 'w', 'b', 'y', 'a'};
+  auto launcher = LaunchRunner<void*, void*, void*, void*, void*>();
+  launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr,
            alpha_ptr);
 
   checkCUDA(cudaDeviceSynchronize());
