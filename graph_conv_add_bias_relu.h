@@ -93,7 +93,7 @@ GetConvAddBiasReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   auto add_op = cudnn_frontend::OperationBuilder(
                     CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                    .setxDesc(conv_op.getOutputTensor())
+                    .setxDesc(tensor_conv)
                     .setbDesc(tensor_z)
                     .setyDesc(tensor_add)
                     .setpwDesc(add_desc)
@@ -110,7 +110,7 @@ GetConvAddBiasReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   auto bias_add_op = cudnn_frontend::OperationBuilder(
                          CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                         .setxDesc(add_op.getOutputTensor())
+                         .setxDesc(tensor_add)
                          .setbDesc(tensor_b)
                          .setyDesc(tensor_bias)
                          .setpwDesc(bias_add_desc)
@@ -125,7 +125,7 @@ GetConvAddBiasReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   auto act_op = cudnn_frontend::OperationBuilder(
                     CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                    .setxDesc(bias_add_op.getOutputTensor())
+                    .setxDesc(tensor_bias)
                     .setyDesc(tensor_y)
                     .setpwDesc(act_desc)
                     .build();

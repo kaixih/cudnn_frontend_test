@@ -94,7 +94,7 @@ GetConvBiasLeakyReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   auto bias_add_op = cudnn_frontend::OperationBuilder(
                          CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                         .setxDesc(conv_op.getOutputTensor())
+                         .setxDesc(tensor_conv)
                          .setbDesc(tensor_b)
                          .setyDesc(tensor_bias)
                          .setpwDesc(bias_add_desc)
@@ -109,7 +109,7 @@ GetConvBiasLeakyReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   auto mul_op = cudnn_frontend::OperationBuilder(
                     CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                    .setxDesc(bias_add_op.getOutputTensor())
+                    .setxDesc(tensor_bias)
                     .setbDesc(scalar_tensor_alpha)
                     .setyDesc(tensor_mul)
                     .setpwDesc(mul_desc)
@@ -124,7 +124,7 @@ GetConvBiasLeakyReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   auto max_op = cudnn_frontend::OperationBuilder(
                     CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                    .setxDesc(bias_add_op.getOutputTensor())
+                    .setxDesc(tensor_bias)
                     .setbDesc(tensor_mul)
                     .setyDesc(tensor_y)
                     .setpwDesc(max_desc)
