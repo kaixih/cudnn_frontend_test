@@ -99,6 +99,7 @@ $ ./test_conv_add_bias_relu.out --input 8,64,128,128,128 --filter 32,64,3,3,3 \
 >>>   output_dims: 8, 32, 128, 128, 128,
 >>>   input_strides: 134217728, 1, 1048576, 8192, 64,
 >>>   filter_strides: 1728, 1, 576, 192, 64,
+>>>   bias_strides: 32, 1, 32, 32, 32,
 >>>   output_strides: 67108864, 1, 524288, 4096, 32,
 >>>   paddings: 1, 1, 1,
 >>>   strides: 1, 1, 1,
