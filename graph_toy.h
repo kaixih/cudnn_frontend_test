@@ -3,53 +3,43 @@
 #include "cudnn_frontend_utils.h"
 
 struct Edge {
-  std::optional<std::string> name;
-  std::optional<cudnn_frontend::Tensor*> desc;
+  std::optional<std::string> tensor_name;
+  std::optional<cudnn_frontend::Tensor*> tensor_ptr;
   Edge() {}
-  Edge(const char* c) : name(c) {}
-  Edge(cudnn_frontend::Tensor* t) : desc(t) {}
+  Edge(const char* c) : tensor_name(c) {}
+  Edge(cudnn_frontend::Tensor* t) : tensor_ptr(t) {}
 };
 
 struct Node {
   std::string op_name;
   cudnn_frontend::BackendDescriptor& desc;
   std::vector<double> scales;
-  std::unordered_map<std::string, Edge> inputs;
-  std::unordered_map<std::string, Edge> outputs;
-};
-
-struct ProcessedNode {
-  std::string op_name;
-  cudnn_frontend::BackendDescriptor* desc;
-  std::vector<double> scales;
-  std::unordered_map<std::string, cudnn_frontend::Tensor*> in_out;
+  std::unordered_map<std::string, Edge> edges;
 };
 
 std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
-    ProcessedNode& processed_node) {
+    Node& node,
+    std::unordered_map<std::string, cudnn_frontend::Tensor*>& tensors) {
   auto op_builder = cudnn_frontend::OperationBuilder(
       CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR);
 
   cudnn_frontend::PointWiseDesc* pw_desc =
-      reinterpret_cast<cudnn_frontend::PointWiseDesc*>(processed_node.desc);
+      reinterpret_cast<cudnn_frontend::PointWiseDesc*>(&node.desc);
   op_builder.setpwDesc(*pw_desc);
 
-  for (const auto& item : processed_node.in_out) {
-    if (item.first == "x") {
-      op_builder.setxDesc(*item.second);
-    } else if (item.first == "b") {
-      op_builder.setbDesc(*item.second);
-    } else if (item.first == "y") {
-      op_builder.setyDesc(*item.second);
-    } else {
-      std::cout << "!!! tensor tag: " << item.first << " is not supported" << std::endl;
-      return {};
+  for (const auto& tensor : tensors) {
+    if (tensor.first == node.op_name + ":x") {
+      op_builder.setxDesc(*tensor.second);
+    } else if (tensor.first == node.op_name + ":b") {
+      op_builder.setbDesc(*tensor.second);
+    } else if (tensor.first == node.op_name + ":y") {
+      op_builder.setyDesc(*tensor.second);
     }
   }
 
-  if (processed_node.scales.size() == 2) {
-    op_builder.setAlpha(processed_node.scales[0]);
-    op_builder.setAlpha2(processed_node.scales[1]);
+  if (node.scales.size() == 2) {
+    op_builder.setAlpha(node.scales[0]);
+    op_builder.setAlpha2(node.scales[1]);
   }
 
   auto op = op_builder.build();
@@ -124,108 +114,92 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> GetToyGraph(
   // clang-format off
   std::vector<Node> nodes = {
       {"convolution", conv_desc, {1., 0.},
-         /*inputs= */{{"x", &tensor_x}, {"w", &tensor_w}},
-         /*outputs=*/{}},
+         /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
       {"add", add_desc, {1., 0.},
-         /*inputs= */{{"x", "convolution"}, {"b", &tensor_z}},
-         /*outputs=*/{}},
+         /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_z}, {"y", ""}}},
       {"bias_add", bias_add_desc, {},
-         /*inputs= */{{"x", "add"}, {"b", &tensor_b}},
-         /*outputs=*/{}},
+         /*edges=*/{{"x", "add:y"}, {"b", &tensor_b}, {"y", ""}}},
       {"relu", act_desc, {},
-         /*inputs= */{{"x", "bias_add"}},
-         /*outputs=*/{{"y", &tensor_y}}}};
+         /*edges=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
   // clang-format on
 
   // std::vector<Node> nodes1 = {
   // {"convolution", conv_desc, {1., 0.}, {&tensor_x, &tensor_w}, {&tensor_y}}
   // };
 
+  // We move the virtual tensors into the map to extend their liveness. Note,
+  // don't use the vector since the reallocation will change the addresses of
+  // the tensors.
+  std::unordered_map<std::string, cudnn_frontend::Tensor> virtual_tensors;
+  // All tensors are marked in "tensors" in the form of:
+  //   "op_name:specifier" -> tensor address
+  std::unordered_map<std::string, cudnn_frontend::Tensor*> tensors;
   int64_t reserved_uid = 1024;
-  // op_output_map is used to store all the virtual tensors.
-  std::unordered_map<std::string, cudnn_frontend::Tensor> op_output_map;
+  // Put virtual (connecting) tensors and given (end) tensors to "tensors". In
+  // this step the virtual tensors can only be marked in the fanout sides.
   for (int i = 0; i < nodes.size(); i++) {
-    if (nodes[i].outputs.size() == 0) {
-      int output_dtype = nodes[i].op_name == "convolution" ? accumulator_type
-                                                           : activation_type;
-      ASSIGN_OR_RETURN(
-          auto tensor_output,
-          CreateCudnnTensor(opts.output_dims, opts.output_strides,
-                            opts.num_dims + 2, reserved_uid++, output_dtype,
-                            /*is_virtual=*/true),
-          "Failed to build the virtual tensor for " + nodes[i].op_name);
+    for (const auto& edge : nodes[i].edges) {
+      std::string tag = nodes[i].op_name + ":" + edge.first;
+      auto tensor_name_or = edge.second.tensor_name;
+      auto tensor_ptr_or = edge.second.tensor_ptr;
+      if (tensor_name_or.has_value() && tensor_name_or.value() == "") {
+        int output_dtype = nodes[i].op_name == "convolution" ? accumulator_type
+                                                             : activation_type;
+        ASSIGN_OR_RETURN(
+            auto tensor_output,
+            CreateCudnnTensor(opts.output_dims, opts.output_strides,
+                              opts.num_dims + 2, reserved_uid++, output_dtype,
+                              /*is_virtual=*/true),
+            "Failed to build the virtual tensor for " + nodes[i].op_name);
 
-      op_output_map.emplace(
-          std::make_pair(nodes[i].op_name, std::move(tensor_output)));
+        virtual_tensors.insert({tag, std::move(tensor_output)});
+        tensors[tag] = &virtual_tensors.at(tag);
+      } else if (tensor_ptr_or.has_value()) {
+        tensors[tag] = tensor_ptr_or.value();
+      }
     }
   }
-
-  std::vector<ProcessedNode> processed_nodes;
+  // Put virtual tensors to "tensors". In this step the virtual tensors can be
+  // marked in the fanin sides.
   for (int i = 0; i < nodes.size(); i++) {
-    ProcessedNode processed_node;
-    processed_node.op_name = nodes[i].op_name;
-    processed_node.desc = &nodes[i].desc;
-    processed_node.scales = nodes[i].scales;
-
-    // The edges in the "inputs" can be a string or tensor, but the edges in
-    // the "outputs" can only a tensor.
-    for (auto& input : nodes[i].inputs) {
-      cudnn_frontend::Tensor* t;
-      if (input.second.name.has_value()) {
-        t = &(op_output_map.at(input.second.name.value()));
-      } else if (input.second.desc.has_value()) {
-        t = input.second.desc.value();
-      } else {
-        std::cout << "!!! Invalid inputs: only support strings (representing "
-                  << "ops) and tensor addresses." << std::endl;
-        return {};
+    for (auto& edge : nodes[i].edges) {
+      auto tensor_name_or = edge.second.tensor_name;
+      if (tensor_name_or.has_value() && tensor_name_or.value() != "") {
+        auto found = tensors.find(tensor_name_or.value());
+        if (found == tensors.end()) {
+          std::cout << "!!! Graph error: cannot find " << tensor_name_or.value()
+                    << std::endl;
+          return {};
+        }
+        tensors[nodes[i].op_name + ":" + edge.first] = found->second;
       }
-      processed_node.in_out[input.first] = t;
     }
-
-    for (auto& output : nodes[i].outputs) {
-      cudnn_frontend::Tensor* t;
-      if (output.second.desc.has_value()) {
-        t = output.second.desc.value();
-      } else {
-        std::cout << "!!! Invalid outputs: only support tensor addresses."
-                  << std::endl;
-        return {};
-      }
-      processed_node.in_out[output.first] = t;
-    }
-
-    // The created virtual tensor will be tagged by "y" by default.
-    auto got_virtual_output = op_output_map.find(nodes[i].op_name);
-    if (got_virtual_output != op_output_map.end()) {
-      processed_node.in_out["y"] = &(got_virtual_output->second);
-    }
-    processed_nodes.push_back(std::move(processed_node));
   }
 
   std::vector<cudnn_frontend::Operation> built_ops;
-  for (int i = 0; i < processed_nodes.size(); i++) {
-    if (processed_nodes[i].op_name == "convolution") {
+  for (int i = 0; i < nodes.size(); i++) {
+    if (nodes[i].op_name == "convolution") {
       cudnnBackendDescriptorType_t conv_kind =
           GetCudnnConvolutionType(opts.conv_kind);
 
-      cudnn_frontend::Tensor* y_tensor = processed_nodes[i].in_out.at("y");
-      cudnn_frontend::Tensor* x_tensor = processed_nodes[i].in_out.at("x");
-      cudnn_frontend::Tensor* w_tensor = processed_nodes[i].in_out.at("w");
-      auto conv_op =
-          cudnn_frontend::OperationBuilder(conv_kind)
-              .setxDesc(*x_tensor)
-              .setyDesc(*y_tensor)
-              .setwDesc(*w_tensor)
-              .setcDesc(*(cudnn_frontend::ConvDesc*)(processed_nodes[i].desc))
-              .setAlpha(processed_nodes[i].scales[0])
-              .setBeta(processed_nodes[i].scales[1])
-              .build();
+      cudnn_frontend::Tensor* y_tensor = tensors.at("convolution:y");
+      cudnn_frontend::Tensor* x_tensor = tensors.at("convolution:x");
+      cudnn_frontend::Tensor* w_tensor = tensors.at("convolution:w");
+      auto conv_op_builder =
+          cudnn_frontend::OperationBuilder(conv_kind);
+      conv_op_builder.setxDesc(*x_tensor);
+      conv_op_builder.setyDesc(*y_tensor);
+      conv_op_builder.setwDesc(*w_tensor);
+      conv_op_builder.setcDesc(*(cudnn_frontend::ConvDesc*)(&nodes[i].desc));
+      conv_op_builder.setAlpha(nodes[i].scales[0]);
+      conv_op_builder.setBeta(nodes[i].scales[1]);
+      auto conv_op = conv_op_builder.build();
+
       RETURN_MSG_IF_CUDNN_ERROR(conv_op);
       built_ops.emplace_back(std::move(conv_op));
     } else {
-      ASSIGN_OR_RETURN(auto op, GetPointwiseOp(processed_nodes[i]),
-                       "Failed to build op" + processed_nodes[i].op_name);
+      ASSIGN_OR_RETURN(auto op, GetPointwiseOp(nodes[i], tensors),
+                       "Failed to build op" + nodes[i].op_name);
       built_ops.emplace_back(std::move(*op));
     }
   }
