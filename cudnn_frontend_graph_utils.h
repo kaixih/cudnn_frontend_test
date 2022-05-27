@@ -103,7 +103,7 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
   // the tensors.
   std::unordered_map<std::string, cudnn_frontend::Tensor> virtual_tensors;
   // All tensors are marked in "tensors" in the form of:
-  //   "op_name:specifier" -> tensor address
+  //   "op_name:port" -> tensor address
   std::unordered_map<std::string, cudnn_frontend::Tensor*> tensors;
   int64_t reserved_uid = 1024;
   // Put virtual (connecting) tensors and given (end) tensors to "tensors". In
