@@ -17,6 +17,42 @@ struct Node {
   std::unordered_map<std::string, Edge> edges;
 };
 
+std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetConvolutionOp(
+    Node& node, cudnnBackendDescriptorType_t& conv_kind,
+    std::unordered_map<std::string, cudnn_frontend::Tensor*>& tensors) {
+  auto op_builder = cudnn_frontend::OperationBuilder(conv_kind);
+
+  cudnn_frontend::ConvDesc* conv_desc =
+      reinterpret_cast<cudnn_frontend::ConvDesc*>(&node.desc);
+  op_builder.setcDesc(*conv_desc);
+
+  for (const auto& tensor : tensors) {
+    if (tensor.first == node.op_name + ":x") {
+      op_builder.setxDesc(*tensor.second);
+    } else if (tensor.first == node.op_name + ":w") {
+      op_builder.setwDesc(*tensor.second);
+    } else if (tensor.first == node.op_name + ":y") {
+      op_builder.setyDesc(*tensor.second);
+    } else if (tensor.first == node.op_name + ":dy") {
+      op_builder.setdyDesc(*tensor.second);
+    } else if (tensor.first == node.op_name + ":dx") {
+      op_builder.setdxDesc(*tensor.second);
+    } else if (tensor.first == node.op_name + ":dw") {
+      op_builder.setdwDesc(*tensor.second);
+    }
+  }
+
+  if (node.scales.size() == 2) {
+    op_builder.setAlpha(node.scales[0]);
+    op_builder.setBeta(node.scales[1]);
+  }
+
+  auto op = op_builder.build();
+  RETURN_MSG_IF_CUDNN_ERROR(op);
+  return std::unique_ptr<cudnn_frontend::Operation>(
+      new cudnn_frontend::Operation(std::move(op)));
+}
+
 std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
     Node& node,
     std::unordered_map<std::string, cudnn_frontend::Tensor*>& tensors) {
@@ -181,22 +217,9 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> GetToyGraph(
     if (nodes[i].op_name == "convolution") {
       cudnnBackendDescriptorType_t conv_kind =
           GetCudnnConvolutionType(opts.conv_kind);
-
-      cudnn_frontend::Tensor* y_tensor = tensors.at("convolution:y");
-      cudnn_frontend::Tensor* x_tensor = tensors.at("convolution:x");
-      cudnn_frontend::Tensor* w_tensor = tensors.at("convolution:w");
-      auto conv_op_builder =
-          cudnn_frontend::OperationBuilder(conv_kind);
-      conv_op_builder.setxDesc(*x_tensor);
-      conv_op_builder.setyDesc(*y_tensor);
-      conv_op_builder.setwDesc(*w_tensor);
-      conv_op_builder.setcDesc(*(cudnn_frontend::ConvDesc*)(&nodes[i].desc));
-      conv_op_builder.setAlpha(nodes[i].scales[0]);
-      conv_op_builder.setBeta(nodes[i].scales[1]);
-      auto conv_op = conv_op_builder.build();
-
-      RETURN_MSG_IF_CUDNN_ERROR(conv_op);
-      built_ops.emplace_back(std::move(conv_op));
+      ASSIGN_OR_RETURN(auto op, GetConvolutionOp(nodes[i], conv_kind, tensors),
+                       "Failed to build op" + nodes[i].op_name);
+      built_ops.emplace_back(std::move(*op));
     } else {
       ASSIGN_OR_RETURN(auto op, GetPointwiseOp(nodes[i], tensors),
                        "Failed to build op" + nodes[i].op_name);
