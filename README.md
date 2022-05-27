@@ -31,9 +31,16 @@ files. This repo already includes these patterns:
 * `<conv_bias_leakyrelu>`: Conv->BiasAdd->LeakyRelu (Runtime Fusion Engine)
 
 In the `graph_<graph_name>.h`, we propose a new way to represent the op graph
-and this way users don't need to create the ops and virtual tensors. For
-example, for the fusion pattern of `conv_bias_leakyrelu`, we need to create a
-graph like below:
+and this way users don't need to create the ops and virtual tensors.
+```
+{
+  {"<op_name_1>", descriptor, scale_factors, edges},
+  {"<op_name_2>", descriptor, scale_factors, edges},
+  ...
+}
+```
+For example, for the fusion pattern of `conv_bias_leakyrelu`, we need to create
+a graph like below:
 
 ![conv_bias_leakyrelu](pics/conv_bias_leakyrelu.png)
 
