@@ -30,6 +30,29 @@ files. This repo already includes these patterns:
 * `<conv_bias_relu6>`: Conv->BiasAdd->Relu6 (Runtime Fusion Engine)
 * `<conv_bias_leakyrelu>`: Conv->BiasAdd->LeakyRelu (Runtime Fusion Engine)
 
+In the `graph_<graph_name>.h`, we propose a new way to represent the op graph
+and this way users don't need to create the ops and virtual tensors. For
+example, for the fusion pattern of `conv_bias_leakyrelu`, we need to create a
+graph like below:
+
+![conv_bias_leakyrelu](pics/conv_bias_leakyrelu.png)
+
+Users can simply use the following data structure to represent the graph and the
+backend will help create the virtual tensors and operations and connect them
+together. Note, this feature is still experimental and we only support
+convolution ops and the most pointwise ops.
+```c++
+  std::vector<Node> nodes = {
+      {"convolution", conv_desc, {1., 0.},
+         /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+      {"bias_add", bias_add_desc, {},
+         /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
+      {"mul", mul_desc, {},
+         /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
+      {"max", max_desc, {},
+         /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"y", &tensor_y}}}};
+```
+
 
 # Usage
 ## Convolution graphs
