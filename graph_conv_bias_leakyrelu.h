@@ -1,5 +1,6 @@
 #include <cudnn_frontend.h>
 
+#include "cudnn_frontend_graph_utils.h"
 #include "cudnn_frontend_utils.h"
 
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
@@ -40,24 +41,8 @@ GetConvBiasLeakyReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
                    "Failed to build tensor alpha");
 
   int accumulator_type = GetConvAccumulatorType(opts.data_type);
-  ASSIGN_OR_RETURN(auto tensor_conv,
-                   CreateCudnnTensor(opts.output_dims, opts.output_strides,
-                                     opts.num_dims + 2, 'C', accumulator_type,
-                                     /*is_virtual=*/true),
-                   "Failed to build tensor conv");
-
   int activation_type = GetConvActivationType(opts.data_type);
-  ASSIGN_OR_RETURN(auto tensor_bias,
-                   CreateCudnnTensor(opts.output_dims, opts.output_strides,
-                                     opts.num_dims + 2, 'B', activation_type,
-                                     /*is_virtual=*/true),
-                   "Failed to build tensor bias");
-  ASSIGN_OR_RETURN(auto tensor_mul,
-                   CreateCudnnTensor(opts.output_dims, opts.output_strides,
-                                     opts.num_dims + 2, 'U', activation_type,
-                                     /*is_virtual=*/true),
-                   "Failed to build tensor mul");
-
+  
   auto conv_mode = CUDNN_CROSS_CORRELATION;
   int conv_dim = opts.num_dims;
 
@@ -74,32 +59,11 @@ GetConvBiasLeakyReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
                        .build();
   RETURN_MSG_IF_CUDNN_ERROR(conv_desc);
 
-  cudnnBackendDescriptorType_t conv_kind =
-      GetCudnnConvolutionType(opts.conv_kind);
-  auto conv_op = cudnn_frontend::OperationBuilder(conv_kind)
-                     .setxDesc(tensor_x)
-                     .setyDesc(tensor_conv)
-                     .setwDesc(tensor_w)
-                     .setcDesc(conv_desc)
-                     .setAlpha(1.0f)
-                     .setBeta(0.0f)
-                     .build();
-  RETURN_MSG_IF_CUDNN_ERROR(conv_op);
-
   auto bias_add_desc = cudnn_frontend::PointWiseDescBuilder()
                            .setMode(CUDNN_POINTWISE_ADD)
                            .setMathPrecision(cudnn_activation_type)
                            .build();
   RETURN_MSG_IF_CUDNN_ERROR(bias_add_desc);
-
-  auto bias_add_op = cudnn_frontend::OperationBuilder(
-                         CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                         .setxDesc(tensor_conv)
-                         .setbDesc(tensor_b)
-                         .setyDesc(tensor_bias)
-                         .setpwDesc(bias_add_desc)
-                         .build();
-  RETURN_MSG_IF_CUDNN_ERROR(bias_add_op);
 
   auto mul_desc = cudnn_frontend::PointWiseDescBuilder()
                       .setMode(CUDNN_POINTWISE_MUL)
@@ -107,39 +71,23 @@ GetConvBiasLeakyReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
                       .build();
   RETURN_MSG_IF_CUDNN_ERROR(mul_desc);
 
-  auto mul_op = cudnn_frontend::OperationBuilder(
-                    CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                    .setxDesc(tensor_bias)
-                    .setbDesc(scalar_tensor_alpha)
-                    .setyDesc(tensor_mul)
-                    .setpwDesc(mul_desc)
-                    .build();
-  RETURN_MSG_IF_CUDNN_ERROR(mul_op);
-
   auto max_desc = cudnn_frontend::PointWiseDescBuilder()
                       .setMode(CUDNN_POINTWISE_MAX)
                       .setMathPrecision(cudnn_activation_type)
                       .build();
   RETURN_MSG_IF_CUDNN_ERROR(max_desc);
 
-  auto max_op = cudnn_frontend::OperationBuilder(
-                    CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
-                    .setxDesc(tensor_bias)
-                    .setbDesc(tensor_mul)
-                    .setyDesc(tensor_y)
-                    .setpwDesc(max_desc)
-                    .build();
-  RETURN_MSG_IF_CUDNN_ERROR(max_op);
+  // clang-format off
+  std::vector<Node> nodes = {
+      {"convolution", conv_desc, {1., 0.},
+         /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+      {"bias_add", bias_add_desc, {},
+         /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
+      {"mul", mul_desc, {},
+         /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
+      {"max", max_desc, {},
+         /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"y", &tensor_y}}}};
+  // clang-format on
 
-  std::array<cudnn_frontend::Operation const*, 4> ops = {&conv_op, &bias_add_op,
-                                                         &mul_op, &max_op};
-
-  auto op_graph = cudnn_frontend::OperationGraphBuilder()
-                      .setHandle(cudnn)
-                      .setOperationGraph(ops.size(), ops.data())
-                      .build();
-  RETURN_MSG_IF_CUDNN_ERROR(op_graph);
-
-  return std::unique_ptr<cudnn_frontend::OperationGraph>(
-      new cudnn_frontend::OperationGraph(std::move(op_graph)));
+  return CreateOpGraph(opts, cudnn, nodes);
 }
