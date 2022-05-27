@@ -121,26 +121,31 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> GetToyGraph(
                       .build();
   RETURN_MSG_IF_CUDNN_ERROR(act_desc);
 
+  // clang-format off
   std::vector<Node> nodes = {
-      {"convolution",
-       conv_desc,
-       {1., 0.},
-       {{"x", &tensor_x}, {"w", &tensor_w}},
-       {}},
-      {"add", add_desc, {1., 0.}, {{"x", "convolution"}, {"b", &tensor_z}}, {}},
-      {"bias_add", bias_add_desc, {}, {{"x", "add"}, {"b", &tensor_b}}, {}},
-      {"relu", act_desc, {}, {{"x", "bias_add"}}, {{"y", &tensor_y}}}};
+      {"convolution", conv_desc, {1., 0.},
+         /*inputs= */{{"x", &tensor_x}, {"w", &tensor_w}},
+         /*outputs=*/{}},
+      {"add", add_desc, {1., 0.},
+         /*inputs= */{{"x", "convolution"}, {"b", &tensor_z}},
+         /*outputs=*/{}},
+      {"bias_add", bias_add_desc, {},
+         /*inputs= */{{"x", "add"}, {"b", &tensor_b}},
+         /*outputs=*/{}},
+      {"relu", act_desc, {},
+         /*inputs= */{{"x", "bias_add"}},
+         /*outputs=*/{{"y", &tensor_y}}}};
+  // clang-format on
 
   // std::vector<Node> nodes1 = {
   // {"convolution", conv_desc, {1., 0.}, {&tensor_x, &tensor_w}, {&tensor_y}}
   // };
 
   int64_t reserved_uid = 1024;
+  // op_output_map is used to store all the virtual tensors.
   std::unordered_map<std::string, cudnn_frontend::Tensor> op_output_map;
   for (int i = 0; i < nodes.size(); i++) {
     if (nodes[i].outputs.size() == 0) {
-      std::cout << "Creating a virtual output tensor for " << nodes[i].op_name
-                << std::endl;
       int output_dtype = nodes[i].op_name == "convolution" ? accumulator_type
                                                            : activation_type;
       ASSIGN_OR_RETURN(
@@ -148,51 +153,53 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> GetToyGraph(
           CreateCudnnTensor(opts.output_dims, opts.output_strides,
                             opts.num_dims + 2, reserved_uid++, output_dtype,
                             /*is_virtual=*/true),
-          "Failed to build virtual tensor for " + nodes[i].op_name);
+          "Failed to build the virtual tensor for " + nodes[i].op_name);
 
       op_output_map.emplace(
           std::make_pair(nodes[i].op_name, std::move(tensor_output)));
     }
   }
-  for (auto& item : op_output_map) {
-    std::cout << item.first << std::endl;
-  }
 
-  std::cout << "Stage 1" << std::endl;
   std::vector<ProcessedNode> processed_nodes;
   for (int i = 0; i < nodes.size(); i++) {
     ProcessedNode processed_node;
     processed_node.op_name = nodes[i].op_name;
     processed_node.desc = &nodes[i].desc;
     processed_node.scales = nodes[i].scales;
-    std::cout << nodes[i].op_name << ": ";
-    // std::unordered_map<std::string, cudnn_frontend::Tensor*> in_out;
+
+    // The edges in the "inputs" can be a string or tensor, but the edges in
+    // the "outputs" can only a tensor.
     for (auto& input : nodes[i].inputs) {
       cudnn_frontend::Tensor* t;
       if (input.second.name.has_value()) {
         t = &(op_output_map.at(input.second.name.value()));
       } else if (input.second.desc.has_value()) {
         t = input.second.desc.value();
+      } else {
+        std::cout << "!!! Invalid inputs: only support strings (representing "
+                  << "ops) and tensor addresses." << std::endl;
+        return {};
       }
       processed_node.in_out[input.first] = t;
-      std::cout << input.first << ", ";
     }
 
     for (auto& output : nodes[i].outputs) {
       cudnn_frontend::Tensor* t;
       if (output.second.desc.has_value()) {
         t = output.second.desc.value();
+      } else {
+        std::cout << "!!! Invalid outputs: only support tensor addresses."
+                  << std::endl;
+        return {};
       }
       processed_node.in_out[output.first] = t;
-      std::cout << output.first << ", ";
     }
 
+    // The created virtual tensor will be tagged by "y" by default.
     auto got_virtual_output = op_output_map.find(nodes[i].op_name);
     if (got_virtual_output != op_output_map.end()) {
       processed_node.in_out["y"] = &(got_virtual_output->second);
-      std::cout << "y, ";
     }
-    std::cout << std::endl;
     processed_nodes.push_back(std::move(processed_node));
   }
 
@@ -217,7 +224,6 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> GetToyGraph(
       RETURN_MSG_IF_CUDNN_ERROR(conv_op);
       built_ops.emplace_back(std::move(conv_op));
     } else {
-      std::cout << "processing " << processed_nodes[i].op_name << std::endl;
       ASSIGN_OR_RETURN(auto op, GetPointwiseOp(processed_nodes[i]),
                        "Failed to build op" + processed_nodes[i].op_name);
       built_ops.emplace_back(std::move(*op));
