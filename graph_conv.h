@@ -1,5 +1,6 @@
 #include <cudnn_frontend.h>
 
+#include "cudnn_frontend_graph_utils.h"
 #include "cudnn_frontend_utils.h"
 
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
@@ -35,28 +36,11 @@ GetUnfusedConvGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
                        .build();
   RETURN_MSG_IF_CUDNN_ERROR(conv_desc);
 
-  double alpha = 1.0;
-  double beta = 0.0;
+  // clang-format off
+  std::vector<Node> nodes = {
+      {"convolution", conv_desc, {1., 0.},
+         /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", &tensor_y}}}};
+  // clang-format on
 
-  cudnnBackendDescriptorType_t conv_kind =
-      GetCudnnConvolutionType(opts.conv_kind);
-  auto op = cudnn_frontend::OperationBuilder(conv_kind)
-                .setxDesc(tensor_x)
-                .setyDesc(tensor_y)
-                .setwDesc(tensor_w)
-                .setcDesc(conv_desc)
-                .setAlpha(alpha)
-                .setBeta(beta)
-                .build();
-  RETURN_MSG_IF_CUDNN_ERROR(op);
-
-  std::array<cudnn_frontend::Operation const*, 1> ops = {&op};
-  auto opGraph = cudnn_frontend::OperationGraphBuilder()
-                     .setHandle(cudnn)
-                     .setOperationGraph(ops.size(), ops.data())
-                     .build();
-  RETURN_MSG_IF_CUDNN_ERROR(opGraph);
-
-  return std::unique_ptr<cudnn_frontend::OperationGraph>(
-      new cudnn_frontend::OperationGraph(std::move(opGraph)));
+  return CreateOpGraph(opts, cudnn, nodes);
 }
