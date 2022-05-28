@@ -25,8 +25,20 @@ int main(int argc, char** argv) {
 
   cudnnHandle_t cudnn = nullptr;
   checkCUDNN(cudnnCreate(&cudnn));
-  ASSIGN_OR_RETURN(auto op_graph, GetConvBiasLeakyReluGraph(opts, cudnn),
-                   "Failed to build the ConvBiasElu graph.");
+ 
+  std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
+      (*fn_leakyrelu)(ConvOpts&, cudnnHandle_t&);
+
+  if (opts.leakyrelu_kind == 0) {
+    fn_leakyrelu = GetConvBiasLeakyRelu0Graph;
+  } else if (opts.leakyrelu_kind == 1) {
+    fn_leakyrelu = GetConvBiasLeakyRelu1Graph;
+  } else if (opts.leakyrelu_kind == 2) {
+    fn_leakyrelu = GetConvBiasLeakyRelu2Graph;
+  }
+
+  ASSIGN_OR_RETURN(auto op_graph, fn_leakyrelu(opts, cudnn),
+                   "Failed to build the ConvBiasLeakyRelu graph.");
   std::vector<std::unique_ptr<cudnn_frontend::ExecutionPlan>> plans;
   CreateOpRunners(cudnn, std::move(op_graph), &plans);
 
@@ -51,6 +63,7 @@ int main(int argc, char** argv) {
   void* b_ptr;
   void* y_ptr;
   void* alpha_ptr;
+  void* zero_ptr;
   void (*init_fn)(void** d_ptr, size_t n, std::function<float()> init_fn);
   void (*print_fn)(void* d_ptr, size_t n, const std::string& prompt);
   if (opts.data_type == 0) {
@@ -66,6 +79,7 @@ int main(int argc, char** argv) {
   init_fn(&b_ptr, opts.bias_size(), InitRandoms);
   init_fn(&y_ptr, opts.output_size(), InitRandoms);
   init_fn(&alpha_ptr, 1, [](){ return 0.3f; });
+  init_fn(&zero_ptr, 1, [](){ return 0.0f; });
 
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {
@@ -73,12 +87,24 @@ int main(int argc, char** argv) {
     print_fn(f_ptr, opts.filter_size(), "### Filter Before:");
     print_fn(b_ptr, opts.bias_size(), "### Bias Before:");
     print_fn(alpha_ptr, 1, "### Alpha Before:");
+    print_fn(zero_ptr, 1, "### Zero Before:");
   }
 
-  int64_t uids[] = {'x', 'w', 'b', 'y', 'a'};
-  auto launcher = LaunchRunner<void*, void*, void*, void*, void*>();
-  launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr,
-           alpha_ptr);
+  if (fn_leakyrelu == GetConvBiasLeakyRelu0Graph) {
+    int64_t uids[] = {'x', 'w', 'b', 'y'};
+    auto launcher = LaunchRunner<void*, void*, void*, void*>();
+    launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr);
+  } else if (fn_leakyrelu == GetConvBiasLeakyRelu1Graph) {
+    int64_t uids[] = {'x', 'w', 'b', 'y', 'a'};
+    auto launcher = LaunchRunner<void*, void*, void*, void*, void*>();
+    launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr,
+             alpha_ptr);
+  } else if (fn_leakyrelu == GetConvBiasLeakyRelu2Graph) {
+    int64_t uids[] = {'x', 'w', 'b', 'y', 'a', '0'};
+    auto launcher = LaunchRunner<void*, void*, void*, void*, void*, void*>();
+    launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr,
+             alpha_ptr, zero_ptr);
+  }
 
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {

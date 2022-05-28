@@ -74,6 +74,7 @@ std::optional<ConvOpts> ParseConvOpts(int argc, char** argv) {
     int data_format = 0;
     int data_type = 0;
     int conv_kind = 0;
+    int leakyrelu_kind = 0;
   };
   auto parser = CmdOpts<CmdConvOpts>::Create(
       {{"--input", &CmdConvOpts::input_dims},
@@ -84,7 +85,8 @@ std::optional<ConvOpts> ParseConvOpts(int argc, char** argv) {
        {"--dilation", &CmdConvOpts::dilations},
        {"--data_format", &CmdConvOpts::data_format},
        {"--data_type", &CmdConvOpts::data_type},
-       {"--conv_kind", &CmdConvOpts::conv_kind}});
+       {"--conv_kind", &CmdConvOpts::conv_kind},
+       {"--leakyrelu_kind", &CmdConvOpts::leakyrelu_kind}});
   auto parsed_opts = parser->parse(argc, argv);
   if (!(parsed_opts.data_type >= 0 && parsed_opts.data_type <= 1)) {
     std::cout << "!!! --data_type: 0=float, 1=half, but we got "
@@ -98,7 +100,12 @@ std::optional<ConvOpts> ParseConvOpts(int argc, char** argv) {
   }
   if (!(parsed_opts.conv_kind >= 0 && parsed_opts.conv_kind <= 2)) {
     std::cout << "!!! --conv_kind: 0=fwd, 1=bwd_filter, 2=bwd_input, "
-              << "but we got " << parsed_opts.data_type << std::endl;
+              << "but we got " << parsed_opts.conv_kind << std::endl;
+    return {};
+  }
+  if (!(parsed_opts.leakyrelu_kind >= 0 && parsed_opts.leakyrelu_kind <= 2)) {
+    std::cout << "!!! --leakyrelu_kind: 0=relu+clip, 1=mul+max, 2=bin-sel, "
+              << "but we got " << parsed_opts.leakyrelu_kind << std::endl;
     return {};
   }
 
@@ -128,6 +135,7 @@ std::optional<ConvOpts> ParseConvOpts(int argc, char** argv) {
   opts.data_type = parsed_opts.data_type;
   opts.data_format = parsed_opts.data_format;
   opts.conv_kind = parsed_opts.conv_kind;
+  opts.leakyrelu_kind = parsed_opts.leakyrelu_kind;
 
   return opts;
 }
@@ -167,4 +175,6 @@ void PrintConvOpts(ConvOpts& opts) {
   print_ints(&opts.data_type, 1, "data_type(0=float,1=half)");
   print_ints(&opts.data_format, 1, "data_format(0=nchw,1=nhwc)");
   print_ints(&opts.conv_kind, 1, "conv_kind(0=fwd,1=bwd_filter,2=bwd_input)");
+  print_ints(&opts.leakyrelu_kind, 1,
+             "leakyrelu_kind(0=relu+clip,1=mul+max,2=bin-sel)");
 }
