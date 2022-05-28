@@ -30,8 +30,11 @@ files. This repo already includes these patterns:
 * `<conv_bias_relu6>`: Conv->BiasAdd->Relu6 (Runtime Fusion Engine)
 * `<conv_bias_leakyrelu>`: Conv->BiasAdd->LeakyRelu (Runtime Fusion Engine)
 
+## Graph Representation
 In the `graph_<graph_name>.h`, we propose a new way to represent the op graph
-and this way users don't need to create the ops and virtual tensors.
+and this way users don't need to create the ops and virtual tensors. Note, this
+feature is still experimental and we only support convolution ops and the most
+pointwise ops.
 ```
 {
   {"<op_name_1>", descriptor, scale_factors, edges},
@@ -39,15 +42,15 @@ and this way users don't need to create the ops and virtual tensors.
   ...
 }
 ```
-For example, for the fusion pattern of `conv_bias_leakyrelu`, we need to create
-a graph like below:
+For example, for the fusion pattern of `conv_bias_leakyrelu`, we can choose to
+use the formula `f(x) = max(x, mul(x, alpha))` for the leakyrelu and create a graph
+like below:
 
-![conv_bias_leakyrelu](pics/conv_bias_leakyrelu.png)
+![conv_bias_leakyrelu1](pics/conv_bias_leakyrelu1.png)
 
-Users can simply use the following data structure to represent the graph and the
+Then, users can simply use the following data structure to represent the graph and the
 backend will help create the virtual tensors and operations and connect them
-together. Note, this feature is still experimental and we only support
-convolution ops and the most pointwise ops.
+together. 
 ```c++
   std::vector<Node> nodes = {
       {"convolution", conv_desc, {1., 0.},
@@ -59,7 +62,27 @@ convolution ops and the most pointwise ops.
       {"max", max_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"y", &tensor_y}}}};
 ```
+Or, we can choose the use this formula
+```
+f(x) = alpha * x if x < 0;
+f(x) = x if x >= 0;
+```
+![conv_bias_leakyrelu2](pics/conv_bias_leakyrelu2.png)
 
+The above op graph can be represented by:
+```c++
+  std::vector<Node> nodes = {
+      {"convolution", conv_desc, {1., 0.},
+         /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+      {"bias_add", bias_add_desc, {},
+         /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
+      {"cmp_ge", cmp_ge_desc, {},
+         /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_zero}, {"y", ""}}},
+      {"mul", mul_desc, {},
+         /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
+      {"select", select_desc, {},
+         /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"t", "cmp_ge:y"}, {"y", &tensor_y}}}};
+```
 
 # Usage
 ## Convolution graphs
