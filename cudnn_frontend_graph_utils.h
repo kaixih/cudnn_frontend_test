@@ -80,6 +80,8 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
       op_builder.setbDesc(*tensor.second);
     } else if (tensor.first == node.op_name + ":y") {
       op_builder.setyDesc(*tensor.second);
+    } else if (tensor.first == node.op_name + ":t") {
+      op_builder.settDesc(*tensor.second);
     }
   }
 
