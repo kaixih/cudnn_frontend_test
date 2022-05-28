@@ -93,5 +93,5 @@ GetConvBiasRelu6Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
          /*edges=*/{{"x", "max:y"}, {"b", &scalar_tensor_six}, {"y", &tensor_y}}}};
   // clang-format on
 
-  return CreateOpGraph(opts, cudnn, nodes);
+  return CreateOpGraph(cudnn, nodes);
 }

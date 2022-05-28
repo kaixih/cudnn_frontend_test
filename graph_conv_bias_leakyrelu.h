@@ -89,5 +89,5 @@ GetConvBiasLeakyReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
          /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"y", &tensor_y}}}};
   // clang-format on
 
-  return CreateOpGraph(opts, cudnn, nodes);
+  return CreateOpGraph(cudnn, nodes);
 }

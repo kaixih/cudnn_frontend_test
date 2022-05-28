@@ -98,7 +98,29 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
 }
 
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
-    ConvOpts& opts, cudnnHandle_t& cudnn, std::vector<Node> &nodes) {
+    cudnnHandle_t& cudnn, std::vector<Node> &nodes) {
+  // There should be only one non-virtual tensor located in a port "y". We
+  // simply use the output shape of it.
+  int64_t ndims = -1;
+  const int64_t* output_dims;
+  const int64_t* output_strides;
+  for (int i = 0; i < nodes.size(); i++) {
+    for (const auto& edge : nodes[i].edges) {
+      auto tensor_ptr_or = edge.second.tensor_ptr;
+      if (edge.first == "y" && tensor_ptr_or.has_value()) {
+        auto tensor_ptr = tensor_ptr_or.value();
+        ndims = tensor_ptr->getDimensionCount();
+        output_dims = tensor_ptr->getDimArray();
+        output_strides = tensor_ptr->getStrideArray();
+      }
+    }
+  }
+  if (nodes.size() > 1 && ndims == -1) {
+    std::cout << "!!! cannot find the output shape for creating virtual "
+              << "tensors." << std::endl;
+    return {};
+  }
+
   // We move the virtual tensors into the map to extend their liveness. Note,
   // don't use the vector since the reallocation will change the addresses of
   // the tensors.
@@ -118,9 +140,9 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
         // The virtual tensor dtype is determined by the op dtype.
         ASSIGN_OR_RETURN(
             auto tensor_output,
-            CreateCudnnTensor(opts.output_dims, opts.output_strides,
-                              opts.num_dims + 2, reserved_uid++,
-                              nodes[i].op_dtype, /*is_virtual=*/true),
+            CreateCudnnTensor(output_dims, output_strides, ndims,
+                              reserved_uid++, nodes[i].op_dtype,
+                              /*is_virtual=*/true),
             "Failed to build the virtual tensor for " + nodes[i].op_name);
 
         virtual_tensors.insert({tag, std::move(tensor_output)});
