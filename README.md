@@ -83,6 +83,9 @@ The above op graph can be represented by:
       {"select", select_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"t", "cmp_ge:y"}, {"y", &tensor_y}}}};
 ```
+Note, the above implementations of leakyrelu is only for illustration purpose.
+In real case, the leakyrelu and relu6 can be realized by setting relu's
+attributes in cudnn.
 
 # Usage
 ## Convolution graphs
