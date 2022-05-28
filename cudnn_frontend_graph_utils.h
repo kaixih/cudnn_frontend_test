@@ -22,6 +22,7 @@ struct Edge {
 
 struct Node {
   std::string op_name;
+  int op_dtype;
   cudnn_frontend::BackendDescriptor& desc;
   std::vector<double> scales;
   std::unordered_map<std::string, Edge> edges;
@@ -98,8 +99,6 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
 
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
     ConvOpts& opts, cudnnHandle_t& cudnn, std::vector<Node> &nodes) {
-  int accumulator_type = GetConvAccumulatorType(opts.data_type);
-  int activation_type = GetConvActivationType(opts.data_type);
   // We move the virtual tensors into the map to extend their liveness. Note,
   // don't use the vector since the reallocation will change the addresses of
   // the tensors.
@@ -116,13 +115,12 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
       auto tensor_name_or = edge.second.tensor_name;
       auto tensor_ptr_or = edge.second.tensor_ptr;
       if (tensor_name_or.has_value() && tensor_name_or.value() == "") {
-        int output_dtype = nodes[i].op_name == "convolution" ? accumulator_type
-                                                             : activation_type;
+        // The virtual tensor dtype is determined by the op dtype.
         ASSIGN_OR_RETURN(
             auto tensor_output,
             CreateCudnnTensor(opts.output_dims, opts.output_strides,
-                              opts.num_dims + 2, reserved_uid++, output_dtype,
-                              /*is_virtual=*/true),
+                              opts.num_dims + 2, reserved_uid++,
+                              nodes[i].op_dtype, /*is_virtual=*/true),
             "Failed to build the virtual tensor for " + nodes[i].op_name);
 
         virtual_tensors.insert({tag, std::move(tensor_output)});

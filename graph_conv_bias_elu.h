@@ -65,11 +65,11 @@ GetConvBiasEluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"convolution", conv_desc, {1., 0.},
+      {"convolution", accumulator_type, conv_desc, {1., 0.},
          /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"bias_add", bias_add_desc, {},
+      {"bias_add", accumulator_type, bias_add_desc, {},
          /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"elu", elu_desc, {},
+      {"elu", activation_type, elu_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
   // clang-format on
 

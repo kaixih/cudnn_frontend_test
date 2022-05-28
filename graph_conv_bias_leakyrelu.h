@@ -79,13 +79,13 @@ GetConvBiasLeakyReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"convolution", conv_desc, {1., 0.},
+      {"convolution", accumulator_type, conv_desc, {1., 0.},
          /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"bias_add", bias_add_desc, {},
+      {"bias_add", accumulator_type, bias_add_desc, {},
          /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"mul", mul_desc, {},
+      {"mul", activation_type, mul_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
-      {"max", max_desc, {},
+      {"max", activation_type, max_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"y", &tensor_y}}}};
   // clang-format on
 
