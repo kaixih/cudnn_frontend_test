@@ -151,9 +151,17 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
 
   std::vector<cudnn_frontend::Operation> built_ops;
   for (int i = 0; i < nodes.size(); i++) {
-    if (nodes[i].op_name == "convolution") {
+    if (nodes[i].op_name.find("convolution") != std::string::npos) {
+      int op_index;
+      if (nodes[i].op_name == "convolution") {
+        op_index = 0;
+      } else if (nodes[i].op_name == "convolution_bwd_filter") {
+        op_index = 1;
+      } else if (nodes[i].op_name == "convolution_bwd_input") {
+        op_index = 2;
+      }
       cudnnBackendDescriptorType_t conv_kind =
-          GetCudnnConvolutionType(opts.conv_kind);
+          GetCudnnConvolutionType(op_index);
       ASSIGN_OR_RETURN(auto op, GetConvolutionOp(nodes[i], conv_kind, tensors),
                        "Failed to build op" + nodes[i].op_name);
       built_ops.emplace_back(std::move(*op));

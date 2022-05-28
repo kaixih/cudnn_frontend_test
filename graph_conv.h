@@ -36,11 +36,27 @@ GetUnfusedConvGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
                        .build();
   RETURN_MSG_IF_CUDNN_ERROR(conv_desc);
 
-  // clang-format off
-  std::vector<Node> nodes = {
-      {"convolution", conv_desc, {1., 0.},
-         /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", &tensor_y}}}};
-  // clang-format on
-
-  return CreateOpGraph(opts, cudnn, nodes);
+  if (opts.conv_kind == 0) {
+    // clang-format off
+    std::vector<Node> nodes = {
+        {"convolution", conv_desc, {1., 0.},
+           /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", &tensor_y}}}};
+    // clang-format on
+    return CreateOpGraph(opts, cudnn, nodes);
+  } else if (opts.conv_kind == 1) {
+    // clang-format off
+    std::vector<Node> nodes = {
+        {"convolution_bwd_filter", conv_desc, {1., 0.},
+           /*edges=*/{{"x", &tensor_x}, {"dw", &tensor_w}, {"dy", &tensor_y}}}};
+    // clang-format on
+    return CreateOpGraph(opts, cudnn, nodes);
+  } else if (opts.conv_kind == 2) {
+    // clang-format off
+    std::vector<Node> nodes = {
+        {"convolution_bwd_input", conv_desc, {1., 0.},
+           /*edges=*/{{"dx", &tensor_x}, {"w", &tensor_w}, {"dy", &tensor_y}}}};
+    // clang-format on
+    return CreateOpGraph(opts, cudnn, nodes);
+  }
+  return {};
 }
