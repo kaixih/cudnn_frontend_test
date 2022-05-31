@@ -53,14 +53,14 @@ leakyrelu(x) = max(x, mul(x, alpha))
 ```
 ![conv_bias_leakyrelu1](pics/conv_bias_leakyrelu1.png)
 ```c++
-  std::vector<Node> nodes = {
-      {"convolution", conv_desc, {1., 0.},
+std::vector<Node> nodes = {
+      {"convolution", accumulator_type, conv_desc, {1., 0.},
          /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"bias_add", bias_add_desc, {},
+      {"bias_add", accumulator_type, bias_add_desc, {},
          /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"mul", mul_desc, {},
+      {"mul", activation_type, mul_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
-      {"max", max_desc, {},
+      {"max", activation_type, max_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"y", &tensor_y}}}};
 ```
 ### LeakyRelu Pattern 2:
@@ -71,15 +71,15 @@ leakyrelu(x) = x if x >= 0 else alpha * x;
 
 ```c++
   std::vector<Node> nodes = {
-      {"convolution", conv_desc, {1., 0.},
+      {"convolution", accumulator_type, conv_desc, {1., 0.},
          /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"bias_add", bias_add_desc, {},
+      {"bias_add", accumulator_type, bias_add_desc, {},
          /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"cmp_ge", cmp_ge_desc, {},
+      {"cmp_ge", activation_type, cmp_ge_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_zero}, {"y", ""}}},
-      {"mul", mul_desc, {},
+      {"mul", activation_type, mul_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
-      {"select", select_desc, {},
+      {"select", activation_type, select_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"t", "cmp_ge:y"}, {"y", &tensor_y}}}};
 ```
 
