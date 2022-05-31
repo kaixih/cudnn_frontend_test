@@ -31,26 +31,27 @@ files. This repo already includes these patterns:
 * `<conv_bias_leakyrelu>`: Conv->BiasAdd->LeakyRelu (Runtime Fusion Engine)
 
 ## Graph Representation
-In the `graph_<graph_name>.h`, we propose a new way to represent the op graph
-and this way users don't need to create the ops and virtual tensors. Note, this
-feature is still experimental and we only support convolution ops and the most
-pointwise ops.
-```
+Typically, users need to manually build the edges ("virtual tensors") and nodes
+("operations") to create the fusion graph for cudnn calls. We found this might
+be verbose and error-prone, so we propose an equivalent but more concise way to
+achieve this: users can represent the fusion graph with a list of operations
+with their input and output ports. Then, we will analyze the list and add the
+cudnn virtual tensors and operations, and wire them together.
+
+```c++
 {
-  {"<op_name_1>", descriptor, scale_factors, edges},
-  {"<op_name_2>", descriptor, scale_factors, edges},
-  ...
+  {"op1", op1_desc, {/*scaling factors*/}, {{"x", &tensor_x}, {"y", ""}},
+  {"op2", op2_desc, {/*scaling factors*/}, {{"x", "op1:y"}, {"y", ""}}},
+  // ...
 }
 ```
-For example, for the fusion pattern of `conv_bias_leakyrelu`, we can choose to
-use the formula `f(x) = max(x, mul(x, alpha))` for the leakyrelu and create a graph
-like below:
 
+We will use the leakyrelu in the `conv_bias_leakyrelu` pattern as an example to show how to use the list. In fact, leakyrelu is supported in the cudnn relu op by setting the `setReluLowerClipSlope()`. However, for illustration purpose, we will use the following two equivalent formulas to represent the pattern:
+### LeakyRelu Pattern 1:
+```python
+leakyrelu(x) = max(x, mul(x, alpha))
+```
 ![conv_bias_leakyrelu1](pics/conv_bias_leakyrelu1.png)
-
-Then, users can simply use the following data structure to represent the graph and the
-backend will help create the virtual tensors and operations and connect them
-together. 
 ```c++
   std::vector<Node> nodes = {
       {"convolution", conv_desc, {1., 0.},
@@ -62,14 +63,12 @@ together.
       {"max", max_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"y", &tensor_y}}}};
 ```
-Or, we can choose the use this formula
-```
-f(x) = alpha * x if x < 0;
-f(x) = x if x >= 0;
+### LeakyRelu Pattern 2:
+```python
+leakyrelu(x) = x if x >= 0 else alpha * x;
 ```
 ![conv_bias_leakyrelu2](pics/conv_bias_leakyrelu2.png)
 
-The above op graph can be represented by:
 ```c++
   std::vector<Node> nodes = {
       {"convolution", conv_desc, {1., 0.},
@@ -83,9 +82,16 @@ The above op graph can be represented by:
       {"select", select_desc, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"t", "cmp_ge:y"}, {"y", &tensor_y}}}};
 ```
-Note, the above implementations of leakyrelu is only for illustration purpose.
-In real case, the leakyrelu and relu6 can be realized by setting relu's
-attributes in cudnn.
+
+Note, this feature is still in the experimental stage. For a more general support, there are places that need to be improved:
+* The virtual tensor dtype is inferred from the corresponding op. Ideally, its
+  dtype should be consistent with the subsequent ops to avoid unnecessary type
+  conversion.
+* The virtual tensor's output shape is simply copied from the real output tensor
+  which we assume there is only one in the graph. Ideally, the output shape of
+  each virtual tensor should be inferred from its corresponding input tensor and
+  operation.
+
 
 # Usage
 ## Convolution graphs
