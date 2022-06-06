@@ -45,7 +45,6 @@ GetConvAddBiasReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
   int conv_dim = opts.num_dims;
 
   cudnnDataType_t cudnn_convolution_type = ToCudnnDataType(accumulator_type);
-  cudnnDataType_t cudnn_activation_type = ToCudnnDataType(activation_type);
   auto conv_desc = cudnn_frontend::ConvDescBuilder()
                        .setComputePrecision(cudnn_convolution_type)
                        .setMathMode(conv_mode)
@@ -57,33 +56,15 @@ GetConvAddBiasReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
                        .build();
   RETURN_MSG_IF_CUDNN_ERROR(conv_desc);
 
-  auto add_desc = cudnn_frontend::PointWiseDescBuilder()
-                      .setMode(CUDNN_POINTWISE_ADD)
-                      .setMathPrecision(cudnn_activation_type)
-                      .build();
-  RETURN_MSG_IF_CUDNN_ERROR(add_desc);
-
-  auto bias_add_desc = cudnn_frontend::PointWiseDescBuilder()
-                           .setMode(CUDNN_POINTWISE_ADD)
-                           .setMathPrecision(cudnn_activation_type)
-                           .build();
-  RETURN_MSG_IF_CUDNN_ERROR(bias_add_desc);
-
-  auto relu_desc = cudnn_frontend::PointWiseDescBuilder()
-                       .setMode(CUDNN_POINTWISE_RELU_FWD)
-                       .setMathPrecision(cudnn_activation_type)
-                       .build();
-  RETURN_MSG_IF_CUDNN_ERROR(relu_desc);
-
   // clang-format off
   std::vector<Node> nodes = {
-      {"convolution", accumulator_type, conv_desc, {1., 0.},
+      {"convolution", accumulator_type, &conv_desc, {1., 0.},
          /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"add", accumulator_type, add_desc, {1., 0.},
+      {"add", accumulator_type, nullptr, {1., 0.},
          /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_z}, {"y", ""}}},
-      {"bias_add", accumulator_type, bias_add_desc, {},
+      {"bias_add", accumulator_type, nullptr, {},
          /*edges=*/{{"x", "add:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"relu", activation_type, relu_desc, {},
+      {"relu", activation_type, nullptr, {},
          /*edges=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
   // clang-format on
 

@@ -47,7 +47,6 @@ GetConvBiasLeakyReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
   int conv_dim = opts.num_dims;
 
   cudnnDataType_t cudnn_convolution_type = ToCudnnDataType(accumulator_type);
-  cudnnDataType_t cudnn_activation_type = ToCudnnDataType(activation_type);
   auto conv_desc = cudnn_frontend::ConvDescBuilder()
                        .setComputePrecision(cudnn_convolution_type)
                        .setMathMode(conv_mode)
@@ -59,33 +58,15 @@ GetConvBiasLeakyReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
                        .build();
   RETURN_MSG_IF_CUDNN_ERROR(conv_desc);
 
-  auto bias_add_desc = cudnn_frontend::PointWiseDescBuilder()
-                           .setMode(CUDNN_POINTWISE_ADD)
-                           .setMathPrecision(cudnn_activation_type)
-                           .build();
-  RETURN_MSG_IF_CUDNN_ERROR(bias_add_desc);
-
-  auto mul_desc = cudnn_frontend::PointWiseDescBuilder()
-                      .setMode(CUDNN_POINTWISE_MUL)
-                      .setMathPrecision(cudnn_activation_type)
-                      .build();
-  RETURN_MSG_IF_CUDNN_ERROR(mul_desc);
-
-  auto max_desc = cudnn_frontend::PointWiseDescBuilder()
-                      .setMode(CUDNN_POINTWISE_MAX)
-                      .setMathPrecision(cudnn_activation_type)
-                      .build();
-  RETURN_MSG_IF_CUDNN_ERROR(max_desc);
-
   // clang-format off
   std::vector<Node> nodes = {
-      {"convolution", accumulator_type, conv_desc, {1., 0.},
+      {"convolution", accumulator_type, &conv_desc, {1., 0.},
          /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"bias_add", accumulator_type, bias_add_desc, {},
+      {"bias_add", accumulator_type, nullptr, {},
          /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"mul", activation_type, mul_desc, {},
+      {"mul", activation_type, nullptr, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
-      {"max", activation_type, max_desc, {},
+      {"max", activation_type, nullptr, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"y", &tensor_y}}}};
   // clang-format on
 

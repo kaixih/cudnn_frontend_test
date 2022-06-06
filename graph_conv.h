@@ -39,21 +39,21 @@ GetUnfusedConvGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
   if (opts.conv_kind == 0) {
     // clang-format off
     std::vector<Node> nodes = {
-        {"convolution", accumulator_type, conv_desc, {1., 0.},
+        {"convolution", accumulator_type, &conv_desc, {1., 0.},
            /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", &tensor_y}}}};
     // clang-format on
     return CreateOpGraph(cudnn, nodes);
   } else if (opts.conv_kind == 1) {
     // clang-format off
     std::vector<Node> nodes = {
-        {"convolution_bwd_filter", accumulator_type, conv_desc, {1., 0.},
+        {"convolution_bwd_filter", accumulator_type, &conv_desc, {1., 0.},
            /*edges=*/{{"x", &tensor_x}, {"dw", &tensor_w}, {"dy", &tensor_y}}}};
     // clang-format on
     return CreateOpGraph(cudnn, nodes);
   } else if (opts.conv_kind == 2) {
     // clang-format off
     std::vector<Node> nodes = {
-        {"convolution_bwd_input", accumulator_type, conv_desc, {1., 0.},
+        {"convolution_bwd_input", accumulator_type, &conv_desc, {1., 0.},
            /*edges=*/{{"dx", &tensor_x}, {"w", &tensor_w}, {"dy", &tensor_y}}}};
     // clang-format on
     return CreateOpGraph(cudnn, nodes);

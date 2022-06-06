@@ -11,6 +11,7 @@ std::optional<cudnn_frontend::Tensor> CreateCudnnTensor(
     const int64_t* dims, const int64_t* strides, int n, int64_t uid, int dtype,
     bool is_virtual);
 cudnnBackendDescriptorType_t GetCudnnConvolutionType(int64_t kind);
+cudnnDataType_t ToCudnnDataType(int data_type);
 
 struct Edge {
   std::optional<std::string> tensor_name;
@@ -23,7 +24,7 @@ struct Edge {
 struct Node {
   std::string op_name;
   int op_dtype;
-  cudnn_frontend::BackendDescriptor& desc;
+  cudnn_frontend::BackendDescriptor* desc;
   std::vector<double> scales;
   std::unordered_map<std::string, Edge> edges;
 };
@@ -34,7 +35,11 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetConvolutionOp(
   auto op_builder = cudnn_frontend::OperationBuilder(conv_kind);
 
   cudnn_frontend::ConvDesc* conv_desc =
-      reinterpret_cast<cudnn_frontend::ConvDesc*>(&node.desc);
+      reinterpret_cast<cudnn_frontend::ConvDesc*>(node.desc);
+  if (conv_desc == nullptr) {
+    std::cout << "!!! convolution desc has to be provided!" << std::endl;
+    return {};
+  }
   op_builder.setcDesc(*conv_desc);
 
   for (const auto& tensor : tensors) {
@@ -71,8 +76,34 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
       CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR);
 
   cudnn_frontend::PointWiseDesc* pw_desc =
-      reinterpret_cast<cudnn_frontend::PointWiseDesc*>(&node.desc);
-  op_builder.setpwDesc(*pw_desc);
+      reinterpret_cast<cudnn_frontend::PointWiseDesc*>(node.desc);
+
+  auto pw_desc_builder = cudnn_frontend::PointWiseDescBuilder();
+  if (pw_desc == nullptr) {
+    pw_desc_builder.setMathPrecision(ToCudnnDataType(node.op_dtype));
+    if (node.op_name == "relu") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_RELU_FWD);
+    } else if (node.op_name == "bias_add" || node.op_name == "add") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_ADD);
+    } else if (node.op_name == "elu") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_ELU_FWD);
+    } else if (node.op_name == "max") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_MAX);
+    } else if (node.op_name == "min") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_MIN);
+    } else if (node.op_name == "mul") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_MUL);
+    } else {
+      std::cout << "!!! cannot create desc for " << node.op_name << std::endl;
+      return {};
+    }
+    auto internal_pw_desc = pw_desc_builder.build();
+    RETURN_MSG_IF_CUDNN_ERROR(internal_pw_desc);
+    pw_desc = &internal_pw_desc;
+    op_builder.setpwDesc(*pw_desc);
+  } else {
+    op_builder.setpwDesc(*pw_desc);
+  }
 
   for (const auto& tensor : tensors) {
     if (tensor.first == node.op_name + ":x") {
