@@ -60,13 +60,13 @@ leakyrelu(x) = max(x, mul(x, alpha))
 ```c++
 std::vector<Node> nodes = {
       {"convolution", accumulator_type, &conv_desc, {1., 0.},
-         /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+         /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
       {"bias_add", accumulator_type, nullptr, {},
-         /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
+         /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
       {"mul", activation_type, nullptr, {},
-         /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
+         /*ports=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
       {"max", activation_type, nullptr, {},
-         /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"y", &tensor_y}}}};
+         /*ports=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"y", &tensor_y}}}};
 ```
 ### LeakyRelu Pattern 2:
 ```python
@@ -77,15 +77,15 @@ leakyrelu(x) = x if x >= 0 else alpha * x;
 ```c++
   std::vector<Node> nodes = {
       {"convolution", accumulator_type, &conv_desc, {1., 0.},
-         /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+         /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
       {"bias_add", accumulator_type, nullptr, {},
-         /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
+         /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
       {"cmp_ge", activation_type, nullptr, {},
-         /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_zero}, {"y", ""}}},
+         /*ports=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_zero}, {"y", ""}}},
       {"mul", activation_type, nullptr, {},
-         /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
+         /*ports=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
       {"select", activation_type, nullptr, {},
-         /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"t", "cmp_ge:y"}, {"y", &tensor_y}}}};
+         /*ports=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"t", "cmp_ge:y"}, {"y", &tensor_y}}}};
 ```
 
 Note, this feature is still in the experimental stage. For a more general support, there are places that need to be improved:

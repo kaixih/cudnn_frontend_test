@@ -65,13 +65,13 @@ GetConvBiasRelu6Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
   // clang-format off
   std::vector<Node> nodes = {
       {"convolution", accumulator_type, &conv_desc, {1., 0.},
-         /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+         /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
       {"bias_add", accumulator_type, nullptr, {},
-         /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
+         /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
       {"max", activation_type, nullptr, {},
-         /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_zero}, {"y", ""}}},
+         /*ports=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_zero}, {"y", ""}}},
       {"min", activation_type, nullptr, {},
-         /*edges=*/{{"x", "max:y"}, {"b", &scalar_tensor_six}, {"y", &tensor_y}}}};
+         /*ports=*/{{"x", "max:y"}, {"b", &scalar_tensor_six}, {"y", &tensor_y}}}};
   // clang-format on
 
   return CreateOpGraph(cudnn, nodes);
