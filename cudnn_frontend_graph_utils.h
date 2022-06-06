@@ -91,6 +91,10 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
       pw_desc_builder.setMode(CUDNN_POINTWISE_MAX);
     } else if (node.op_name == "min") {
       pw_desc_builder.setMode(CUDNN_POINTWISE_MIN);
+    } else if (node.op_name == "cmp_ge") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_CMP_GE);
+    } else if (node.op_name == "select") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_BINARY_SELECT);
     } else if (node.op_name == "mul") {
       pw_desc_builder.setMode(CUDNN_POINTWISE_MUL);
     } else {
