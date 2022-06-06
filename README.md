@@ -40,11 +40,16 @@ cudnn virtual tensors and operations, and wire them together.
 
 ```c++
 {
-  {"op1", op1_desc, {/*scaling factors*/}, {{"x", &tensor_x}, {"y", ""}},
-  {"op2", op2_desc, {/*scaling factors*/}, {{"x", "op1:y"}, {"y", ""}}},
+  {"op1", op1_dtype, &op1_desc, {/*scaling factors*/}, {{"x", &tensor_x}, {"y", ""}},
+  {"op2", op2_dtype, &op2_desc, {/*scaling factors*/}, {{"x", "op1:y"}, {"y", ""}}},
   // ...
 }
 ```
+Note, the `op_desc` is optional if the corresponding op is pointwise. The `""`
+indicates we'd like the backend to create the virtual tensor for us.
+Alternatively, it can be replace by a manually created tensor descriptor when we
+want to fetch the intermediate results or specify the data type if the model is
+senstive to type casting of intermediate results.
 
 We will use the leakyrelu in the `conv_bias_leakyrelu` pattern as an example to show how to use the list. In fact, leakyrelu is supported in the cudnn relu op by setting the `setReluLowerClipSlope()`. However, for illustration purpose, we will use the following two equivalent formulas to represent the pattern:
 ### LeakyRelu Pattern 1:
@@ -54,13 +59,13 @@ leakyrelu(x) = max(x, mul(x, alpha))
 ![conv_bias_leakyrelu1](pics/conv_bias_leakyrelu1.png)
 ```c++
 std::vector<Node> nodes = {
-      {"convolution", accumulator_type, conv_desc, {1., 0.},
+      {"convolution", accumulator_type, &conv_desc, {1., 0.},
          /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"bias_add", accumulator_type, bias_add_desc, {},
+      {"bias_add", accumulator_type, nullptr, {},
          /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"mul", activation_type, mul_desc, {},
+      {"mul", activation_type, nullptr, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
-      {"max", activation_type, max_desc, {},
+      {"max", activation_type, nullptr, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"y", &tensor_y}}}};
 ```
 ### LeakyRelu Pattern 2:
@@ -71,15 +76,15 @@ leakyrelu(x) = x if x >= 0 else alpha * x;
 
 ```c++
   std::vector<Node> nodes = {
-      {"convolution", accumulator_type, conv_desc, {1., 0.},
+      {"convolution", accumulator_type, &conv_desc, {1., 0.},
          /*edges=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"bias_add", accumulator_type, bias_add_desc, {},
+      {"bias_add", accumulator_type, nullptr, {},
          /*edges=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"cmp_ge", activation_type, cmp_ge_desc, {},
+      {"cmp_ge", activation_type, nullptr, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_zero}, {"y", ""}}},
-      {"mul", activation_type, mul_desc, {},
+      {"mul", activation_type, nullptr, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", &scalar_tensor_alpha}, {"y", ""}}},
-      {"select", activation_type, select_desc, {},
+      {"select", activation_type, nullptr, {},
          /*edges=*/{{"x", "bias_add:y"}, {"b", "mul:y"}, {"t", "cmp_ge:y"}, {"y", &tensor_y}}}};
 ```
 
