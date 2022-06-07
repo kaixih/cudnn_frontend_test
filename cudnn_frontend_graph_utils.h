@@ -69,6 +69,36 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetConvolutionOp(
       new cudnn_frontend::Operation(std::move(op)));
 }
 
+std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetMatMulOp(
+    Node& node,
+    std::unordered_map<std::string, cudnn_frontend::Tensor*>& tensors) {
+  auto matmul_mode = CUDNN_BACKEND_OPERATION_MATMUL_DESCRIPTOR;
+  auto op_builder = cudnn_frontend::OperationBuilder(matmul_mode);
+
+  cudnn_frontend::MatMulDesc* matmul_desc =
+      reinterpret_cast<cudnn_frontend::MatMulDesc*>(node.desc);
+  if (matmul_desc == nullptr) {
+    std::cout << "!!! matmul desc has to be provided!" << std::endl;
+    return {};
+  }
+  op_builder.setmatmulDesc(*matmul_desc);
+
+  for (const auto& tensor : tensors) {
+    if (tensor.first == node.op_name + ":a") {
+      op_builder.setaMatDesc(*tensor.second);
+    } else if (tensor.first == node.op_name + ":b") {
+      op_builder.setbMatDesc(*tensor.second);
+    } else if (tensor.first == node.op_name + ":c") {
+      op_builder.setcMatDesc(*tensor.second);
+    }
+  }
+
+  auto op = op_builder.build();
+  RETURN_MSG_IF_CUDNN_ERROR(op);
+  return std::unique_ptr<cudnn_frontend::Operation>(
+      new cudnn_frontend::Operation(std::move(op)));
+}
+
 std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
     Node& node,
     std::unordered_map<std::string, cudnn_frontend::Tensor*>& tensors) {
@@ -97,6 +127,10 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
       pw_desc_builder.setMode(CUDNN_POINTWISE_BINARY_SELECT);
     } else if (node.op_name == "mul") {
       pw_desc_builder.setMode(CUDNN_POINTWISE_MUL);
+    } else if (node.op_name == "tanh") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_TANH_FWD);
+    } else if (node.op_name == "sigmoid") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_SIGMOID_FWD);
     } else {
       std::cout << "!!! cannot create desc for " << node.op_name << std::endl;
       return {};
@@ -218,6 +252,10 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
       cudnnBackendDescriptorType_t conv_kind =
           GetCudnnConvolutionType(op_index);
       ASSIGN_OR_RETURN(auto op, GetConvolutionOp(nodes[i], conv_kind, tensors),
+                       "Failed to build op" + nodes[i].op_name);
+      built_ops.emplace_back(std::move(*op));
+    } else if (nodes[i].op_name == "matmul") {
+      ASSIGN_OR_RETURN(auto op, GetMatMulOp(nodes[i], tensors),
                        "Failed to build op" + nodes[i].op_name);
       built_ops.emplace_back(std::move(*op));
     } else {

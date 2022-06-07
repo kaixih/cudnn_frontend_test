@@ -82,3 +82,33 @@ struct ConvOpts {
                            std::multiplies<int64_t>());
   }
 };
+
+struct MatMulOpts {
+  int64_t num_dims = 3;
+  int64_t input0_dims[5];
+  int64_t input1_dims[5];
+  int64_t output_dims[5];
+  int64_t bias_dims[5];
+  int64_t input0_strides[5];
+  int64_t input1_strides[5];
+  int64_t output_strides[5];
+  int64_t bias_strides[5];
+  int64_t data_type;
+
+  int64_t input0_size() {
+    return std::accumulate(input0_dims, input0_dims + num_dims, 1,
+                           std::multiplies<int64_t>());
+  }
+  int64_t input1_size() {
+    return std::accumulate(input1_dims, input1_dims + num_dims, 1,
+                           std::multiplies<int64_t>());
+  }
+  int64_t output_size() {
+    return std::accumulate(output_dims, output_dims + num_dims, 1,
+                           std::multiplies<int64_t>());
+  }
+  int64_t bias_size() {
+    return std::accumulate(bias_dims, bias_dims + num_dims, 1,
+                           std::multiplies<int64_t>());
+  }
+};

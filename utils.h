@@ -40,6 +40,13 @@ void ComputeOutputDims(ConvOpts& opts) {
   }
 }
 
+void ComputeOutputDims(MatMulOpts& opts) {
+  // Compute output dims.
+  opts.output_dims[0] = opts.input0_dims[0];
+  opts.output_dims[1] = opts.input0_dims[1];
+  opts.output_dims[2] = opts.input1_dims[2];
+}
+
 void ComputeStrides(ConvOpts& opts, int data_format) {
   auto compute_strides = [&](const int64_t* dims, int64_t* strides) {
     int tensor_dims = opts.num_dims + 2;
@@ -59,6 +66,20 @@ void ComputeStrides(ConvOpts& opts, int data_format) {
   };
   compute_strides(opts.input_dims, opts.input_strides);
   compute_strides(opts.filter_dims, opts.filter_strides);
+  compute_strides(opts.output_dims, opts.output_strides);
+  compute_strides(opts.bias_dims, opts.bias_strides);
+}
+
+void ComputeStrides(MatMulOpts& opts) {
+  auto compute_strides = [&](const int64_t* dims, int64_t* strides) {
+    int tensor_dims = opts.num_dims;
+    strides[tensor_dims - 1] = 1;
+    for (int64_t d = tensor_dims - 2; d >= 0; d--) {
+      strides[d] = strides[d + 1] * dims[d + 1];
+    }
+  };
+  compute_strides(opts.input0_dims, opts.input0_strides);
+  compute_strides(opts.input1_dims, opts.input1_strides);
   compute_strides(opts.output_dims, opts.output_strides);
   compute_strides(opts.bias_dims, opts.bias_strides);
 }
@@ -140,6 +161,55 @@ std::optional<ConvOpts> ParseConvOpts(int argc, char** argv) {
   return opts;
 }
 
+std::optional<MatMulOpts> ParseMatMulOpts(int argc, char** argv) {
+  struct CmdMatMulOpts {
+    std::string input0_dims = "1,8,16";
+    std::string input1_dims = "1,16,32";
+    std::string bias_dims = "1,1,32";
+    int data_type = 1;
+  };
+  auto parser = CmdOpts<CmdMatMulOpts>::Create(
+      {{"--input0", &CmdMatMulOpts::input0_dims},
+       {"--input1", &CmdMatMulOpts::input1_dims},
+       {"--bias", &CmdMatMulOpts::bias_dims},
+       {"--data_type", &CmdMatMulOpts::data_type}});
+  auto parsed_opts = parser->parse(argc, argv);
+  if (!(parsed_opts.data_type >= 0 && parsed_opts.data_type <= 1)) {
+    std::cout << "!!! --data_type: 0=float, 1=half, but we got "
+              << parsed_opts.data_type << std::endl;
+    return {};
+  }
+
+  MatMulOpts opts;
+  auto str2int_parser = [&](const std::string& str, int64_t* dst_array,
+                            bool update_num_dims = false) {
+    std::stringstream ss(str);
+    int index = 0;
+    for (int i; ss >> i;) {
+      dst_array[index++] = i;
+      if (ss.peek() == ',') ss.ignore();
+    }
+    if (update_num_dims) {
+      opts.num_dims = index;
+    }
+  };
+  // We use "input0_dims" to determine the convolution dim, i.e. 2D or 3D.
+  str2int_parser(parsed_opts.input0_dims, opts.input0_dims, true);
+  str2int_parser(parsed_opts.input1_dims, opts.input1_dims);
+  str2int_parser(parsed_opts.bias_dims, opts.bias_dims);
+
+  if (opts.num_dims != 3) {
+    std::cout << "!!! We only support input dims equal to 3, but we got "
+              << opts.num_dims << std::endl;
+    return {};
+  }
+  ComputeOutputDims(opts);
+  ComputeStrides(opts);
+  opts.data_type = parsed_opts.data_type;
+
+  return opts;
+}
+
 int ParseEngineOpts(int argc, char** argv) {
   struct CmdEngineOpts {
     int engine_index = 0;
@@ -177,4 +247,25 @@ void PrintConvOpts(ConvOpts& opts) {
   print_ints(&opts.conv_kind, 1, "conv_kind(0=fwd,1=bwd_filter,2=bwd_input)");
   print_ints(&opts.leakyrelu_kind, 1,
              "leakyrelu_kind(0=relu+clip,1=mul+max,2=bin-sel)");
+}
+
+void PrintMatMulOpts(MatMulOpts& opts) {
+  std::cout << ">>> MATRIX MULTIPLICATION:" << std::endl;
+  auto print_ints = [](const int64_t* a, int n, const std::string& name) {
+    std::cout << ">>>   " << name << ": ";
+    for (int i = 0; i < n; i++) {
+      std::cout << a[i] << ", ";
+    }
+    std::cout << std::endl;
+  };
+  print_ints(&opts.num_dims, 1, "num_dims");
+  print_ints(opts.input0_dims, opts.num_dims, "input0_dims");
+  print_ints(opts.input1_dims, opts.num_dims, "input1_dims");
+  print_ints(opts.bias_dims, opts.num_dims, "bias_dims");
+  print_ints(opts.output_dims, opts.num_dims, "output_dims");
+  print_ints(opts.input0_strides, opts.num_dims, "input0_strides");
+  print_ints(opts.input1_strides, opts.num_dims, "input1_strides");
+  print_ints(opts.bias_strides, opts.num_dims, "bias_strides");
+  print_ints(opts.output_strides, opts.num_dims, "output_strides");
+  print_ints(&opts.data_type, 1, "data_type(0=float,1=half)");
 }
