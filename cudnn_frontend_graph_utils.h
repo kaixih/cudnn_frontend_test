@@ -252,15 +252,15 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
       cudnnBackendDescriptorType_t conv_kind =
           GetCudnnConvolutionType(op_index);
       ASSIGN_OR_RETURN(auto op, GetConvolutionOp(nodes[i], conv_kind, tensors),
-                       "Failed to build op" + nodes[i].op_name);
+                       "Failed to build op " + nodes[i].op_name);
       built_ops.emplace_back(std::move(*op));
     } else if (nodes[i].op_name == "matmul") {
       ASSIGN_OR_RETURN(auto op, GetMatMulOp(nodes[i], tensors),
-                       "Failed to build op" + nodes[i].op_name);
+                       "Failed to build op " + nodes[i].op_name);
       built_ops.emplace_back(std::move(*op));
     } else {
       ASSIGN_OR_RETURN(auto op, GetPointwiseOp(nodes[i], tensors),
-                       "Failed to build op" + nodes[i].op_name);
+                       "Failed to build op " + nodes[i].op_name);
       built_ops.emplace_back(std::move(*op));
     }
   }

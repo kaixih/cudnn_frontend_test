@@ -88,7 +88,7 @@ std::optional<ConvOpts> ParseConvOpts(int argc, char** argv) {
   struct CmdConvOpts {
     std::string input_dims = "3,8,10,10";
     std::string filter_dims = "8,8,2,2,1";
-    std::string bias_dims = "0,0,0,0,0";
+    std::string bias_dims = "1,8,1,1,1";
     std::string paddings = "1,1,1";
     std::string strides = "1,1,1";
     std::string dilations = "1,1,1";
