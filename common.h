@@ -94,6 +94,7 @@ struct MatMulOpts {
   int64_t output_strides[5];
   int64_t bias_strides[5];
   int64_t data_type;
+  int64_t act_kind;
 
   int64_t input0_size() {
     return std::accumulate(input0_dims, input0_dims + num_dims, 1,

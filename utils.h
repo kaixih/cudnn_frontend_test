@@ -162,12 +162,14 @@ std::optional<MatMulOpts> ParseMatMulOpts(int argc, char** argv) {
     std::string input1_dims = "1,16,32";
     std::string bias_dims = "1,1,32";
     int data_type = 1;
+    int act_kind = 0;
   };
   auto parser = CmdOpts<CmdMatMulOpts>::Create(
       {{"--input0", &CmdMatMulOpts::input0_dims},
        {"--input1", &CmdMatMulOpts::input1_dims},
        {"--bias", &CmdMatMulOpts::bias_dims},
-       {"--data_type", &CmdMatMulOpts::data_type}});
+       {"--data_type", &CmdMatMulOpts::data_type},
+       {"--act_kind", &CmdMatMulOpts::act_kind}});
   auto parsed_opts = parser->parse(argc, argv);
   if (!(parsed_opts.data_type >= 0 && parsed_opts.data_type <= 1)) {
     std::cout << "!!! --data_type: 0=float, 1=half, but we got "
@@ -201,6 +203,7 @@ std::optional<MatMulOpts> ParseMatMulOpts(int argc, char** argv) {
   ComputeOutputDims(opts);
   ComputeStrides(opts);
   opts.data_type = parsed_opts.data_type;
+  opts.act_kind = parsed_opts.act_kind;
 
   return opts;
 }
@@ -263,4 +266,5 @@ void PrintMatMulOpts(MatMulOpts& opts) {
   print_ints(opts.bias_strides, opts.num_dims, "bias_strides");
   print_ints(opts.output_strides, opts.num_dims, "output_strides");
   print_ints(&opts.data_type, 1, "data_type(0=float,1=half)");
+  print_ints(&opts.act_kind, 1, "act_kind(0=tanh,1=sigmoid)");
 }

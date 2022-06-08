@@ -4,7 +4,7 @@
 
 #include "cmd_options.h"
 #include "common.h"
-#include "graph_matmul_bias_tanh.h"
+#include "graph_matmul_bias_activation.h"
 #include "utils.h"
 
 int main(int argc, char** argv) {
@@ -25,7 +25,20 @@ int main(int argc, char** argv) {
 
   cudnnHandle_t cudnn = nullptr;
   checkCUDNN(cudnnCreate(&cudnn));
-  ASSIGN_OR_RETURN(auto op_graph, GetMatMulBiasTanhGraph(opts, cudnn),
+
+  std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
+      (*fn_graph)(MatMulOpts&, cudnnHandle_t&);
+
+  if (opts.act_kind == 0) {
+    fn_graph = GetMatMulBiasTanhGraph;
+  } else if (opts.act_kind == 1) {
+    fn_graph = GetMatMulBiasSigmoidGraph;
+  } else {
+    std::cout << "!!! This test only supports --act_kind 0|1." << std::endl;
+    return {};
+  }
+
+  ASSIGN_OR_RETURN(auto op_graph, fn_graph(opts, cudnn),
                    "Failed to build the MatMulBiasTanh graph.");
   std::vector<std::unique_ptr<cudnn_frontend::ExecutionPlan>> plans;
   CreateOpRunners(cudnn, std::move(op_graph), &plans);
