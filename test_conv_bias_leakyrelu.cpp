@@ -29,12 +29,15 @@ int main(int argc, char** argv) {
   std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
       (*fn_leakyrelu)(ConvOpts&, cudnnHandle_t&);
 
-  if (opts.leakyrelu_kind == 0) {
+  if (opts.act_kind == 0) {
     fn_leakyrelu = GetConvBiasLeakyRelu0Graph;
-  } else if (opts.leakyrelu_kind == 1) {
+  } else if (opts.act_kind == 1) {
     fn_leakyrelu = GetConvBiasLeakyRelu1Graph;
-  } else if (opts.leakyrelu_kind == 2) {
+  } else if (opts.act_kind == 2) {
     fn_leakyrelu = GetConvBiasLeakyRelu2Graph;
+  } else {
+    std::cout << "!!! This test only supports --act_kind 0|1|2." << std::endl;
+    return {};
   }
 
   ASSIGN_OR_RETURN(auto op_graph, fn_leakyrelu(opts, cudnn),

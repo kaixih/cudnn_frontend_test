@@ -63,7 +63,7 @@ struct ConvOpts {
   int64_t data_type;
   int64_t data_format;
   int64_t conv_kind;
-  int64_t leakyrelu_kind;
+  int64_t act_kind;
 
   int64_t input_size() {
     return std::accumulate(input_dims, input_dims + num_dims + 2, 1,
