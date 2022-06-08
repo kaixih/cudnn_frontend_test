@@ -117,6 +117,9 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
       pw_desc_builder.setMode(CUDNN_POINTWISE_ADD);
     } else if (node.op_name == "elu") {
       pw_desc_builder.setMode(CUDNN_POINTWISE_ELU_FWD);
+    } else if (node.op_name == "relu6") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_RELU_FWD);
+      pw_desc_builder.setReluUpperClip(6.0);
     } else if (node.op_name == "max") {
       pw_desc_builder.setMode(CUDNN_POINTWISE_MAX);
     } else if (node.op_name == "min") {

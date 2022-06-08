@@ -25,8 +25,21 @@ int main(int argc, char** argv) {
 
   cudnnHandle_t cudnn = nullptr;
   checkCUDNN(cudnnCreate(&cudnn));
-  ASSIGN_OR_RETURN(auto op_graph, GetConvBiasRelu6Graph(opts, cudnn),
-                   "Failed to build the ConvBiasElu graph.");
+
+  std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
+      (*fn_relu6)(ConvOpts&, cudnnHandle_t&);
+
+  if (opts.act_kind == 0) {
+    fn_relu6 = GetConvBiasRelu6Graph0;
+  } else if (opts.act_kind == 1) {
+    fn_relu6 = GetConvBiasRelu6Graph1;
+  } else {
+    std::cout << "!!! This test only supports --act_kind 0|1." << std::endl;
+    return {};
+  }
+
+  ASSIGN_OR_RETURN(auto op_graph, fn_relu6(opts, cudnn),
+                   "Failed to build the ConvBiasRelu6 graph.");
   std::vector<std::unique_ptr<cudnn_frontend::ExecutionPlan>> plans;
   CreateOpRunners(cudnn, std::move(op_graph), &plans);
 
@@ -78,10 +91,16 @@ int main(int argc, char** argv) {
     print_fn(six_ptr, 1, "### Six Before:");
   }
 
-  int64_t uids[] = {'x', 'w', 'b', 'y', '0', '6'};
-  auto launcher = LaunchRunner<void*, void*, void*, void*, void*, void*>();
-  launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr, zero_ptr,
-           six_ptr);
+  if (fn_relu6 == GetConvBiasRelu6Graph0) {
+    int64_t uids[] = {'x', 'w', 'b', 'y'};
+    auto launcher = LaunchRunner<void*, void*, void*, void*>();
+    launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr);
+  } else if (fn_relu6 == GetConvBiasRelu6Graph1) {
+    int64_t uids[] = {'x', 'w', 'b', 'y', '0', '6'};
+    auto launcher = LaunchRunner<void*, void*, void*, void*, void*, void*>();
+    launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr,
+             zero_ptr, six_ptr);
+  }
 
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {
