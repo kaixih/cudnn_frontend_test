@@ -39,6 +39,7 @@ GetConvBiasEluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
   int conv_dim = opts.num_dims;
 
   cudnnDataType_t cudnn_convolution_type = ToCudnnDataType(accumulator_type);
+  cudnnDataType_t cudnn_activation_type = ToCudnnDataType(activation_type);
   auto conv_desc = cudnn_frontend::ConvDescBuilder()
                        .setComputePrecision(cudnn_convolution_type)
                        .setMathMode(conv_mode)
@@ -50,13 +51,20 @@ GetConvBiasEluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
                        .build();
   RETURN_MSG_IF_CUDNN_ERROR(conv_desc);
 
+  auto elu_desc = cudnn_frontend::PointWiseDescBuilder()
+                      .setMode(CUDNN_POINTWISE_ELU_FWD)
+                      .setMathPrecision(cudnn_activation_type)
+                      .setEluAlpha(1.0)
+                      .build();
+  RETURN_MSG_IF_CUDNN_ERROR(elu_desc);
+
   // clang-format off
   std::vector<Node> nodes = {
       {"convolution", accumulator_type, &conv_desc, {1., 0.},
          /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
       {"bias_add", accumulator_type, nullptr, {},
          /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"elu", activation_type, nullptr, {},
+      {"elu", activation_type, &elu_desc, {},
          /*ports=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
   // clang-format on
 
