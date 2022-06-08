@@ -32,13 +32,6 @@ GetConvBiasLeakyReluGraph0(ConvOpts& opts, cudnnHandle_t& cudnn) {
                                      opts.num_dims + 2, 'b', opts.data_type),
                    "Failed to build tensor b");
 
-  std::vector<int64_t> scalar_dims(opts.num_dims + 2, 1);
-  std::vector<int64_t> scalar_strides(opts.num_dims + 2, 1);
-  ASSIGN_OR_RETURN(auto scalar_tensor_alpha,
-                   CreateCudnnTensor(scalar_dims.data(), scalar_strides.data(),
-                                     opts.num_dims + 2, 'a', opts.data_type),
-                   "Failed to build tensor alpha");
-
   int accumulator_type = GetConvAccumulatorType(opts.data_type);
   int activation_type = GetConvActivationType(opts.data_type);
   
