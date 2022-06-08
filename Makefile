@@ -1,10 +1,15 @@
 INCLUDES = -I cudnn-frontend/include/
 CPPFLAGS = $(INCLUDES) -DNV_CUDNN_DISABLE_EXCEPTION -lcudnn -std=c++17
+CXX = nvcc
 
-TARGET = test_matmul_bias_tanh
+SRCS := $(wildcard test_*.cpp)
+OBJS = $(SRCS:.cpp=.out)
 
-all:
-	nvcc ${TARGET}.cpp ${CPPFLAGS} -o ${TARGET}.out
+all: $(OBJS)
+
+$(OBJS): %.out: %.cpp
+	${CXX} ${CPPFLAGS} -o $@ $<
 
 clean:
 	rm -rf *.out
+
