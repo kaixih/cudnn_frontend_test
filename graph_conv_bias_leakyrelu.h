@@ -4,7 +4,7 @@
 #include "cudnn_frontend_utils.h"
 
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
-GetConvBiasLeakyRelu0Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
+GetConvBiasLeakyReluGraph0(ConvOpts& opts, cudnnHandle_t& cudnn) {
   // CUDNN fused operation supports the pattern in the form of
   // Conv + BiasAdd + LeakyRelu. Therefore, we need to build a graph of the
   // four ops with their input/output tensor edges:
@@ -79,7 +79,7 @@ GetConvBiasLeakyRelu0Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 }
 
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
-GetConvBiasLeakyRelu1Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
+GetConvBiasLeakyReluGraph1(ConvOpts& opts, cudnnHandle_t& cudnn) {
   // CUDNN fused operation supports the pattern in the form of
   // Conv + BiasAdd + LeakyRelu. Therefore, we need to build a graph of the
   // four ops with their input/output tensor edges:
@@ -149,7 +149,7 @@ GetConvBiasLeakyRelu1Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 }
 
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
-GetConvBiasLeakyRelu2Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
+GetConvBiasLeakyReluGraph2(ConvOpts& opts, cudnnHandle_t& cudnn) {
   // CUDNN fused operation supports the pattern in the form of
   // Conv + BiasAdd + LeakyRelu. Therefore, we need to build a graph of the
   // four ops with their input/output tensor edges:

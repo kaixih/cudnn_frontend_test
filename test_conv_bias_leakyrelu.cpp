@@ -30,11 +30,11 @@ int main(int argc, char** argv) {
       (*fn_leakyrelu)(ConvOpts&, cudnnHandle_t&);
 
   if (opts.act_kind == 0) {
-    fn_leakyrelu = GetConvBiasLeakyRelu0Graph;
+    fn_leakyrelu = GetConvBiasLeakyReluGraph0;
   } else if (opts.act_kind == 1) {
-    fn_leakyrelu = GetConvBiasLeakyRelu1Graph;
+    fn_leakyrelu = GetConvBiasLeakyReluGraph1;
   } else if (opts.act_kind == 2) {
-    fn_leakyrelu = GetConvBiasLeakyRelu2Graph;
+    fn_leakyrelu = GetConvBiasLeakyReluGraph2;
   } else {
     std::cout << "!!! This test only supports --act_kind 0|1|2." << std::endl;
     return {};
@@ -93,16 +93,16 @@ int main(int argc, char** argv) {
     print_fn(zero_ptr, 1, "### Zero Before:");
   }
 
-  if (fn_leakyrelu == GetConvBiasLeakyRelu0Graph) {
+  if (fn_leakyrelu == GetConvBiasLeakyReluGraph0) {
     int64_t uids[] = {'x', 'w', 'b', 'y'};
     auto launcher = LaunchRunner<void*, void*, void*, void*>();
     launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr);
-  } else if (fn_leakyrelu == GetConvBiasLeakyRelu1Graph) {
+  } else if (fn_leakyrelu == GetConvBiasLeakyReluGraph1) {
     int64_t uids[] = {'x', 'w', 'b', 'y', 'a'};
     auto launcher = LaunchRunner<void*, void*, void*, void*, void*>();
     launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr,
              alpha_ptr);
-  } else if (fn_leakyrelu == GetConvBiasLeakyRelu2Graph) {
+  } else if (fn_leakyrelu == GetConvBiasLeakyReluGraph2) {
     int64_t uids[] = {'x', 'w', 'b', 'y', 'a', '0'};
     auto launcher = LaunchRunner<void*, void*, void*, void*, void*, void*>();
     launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr,
