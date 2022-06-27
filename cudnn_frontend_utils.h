@@ -220,8 +220,35 @@ struct LaunchRunner {
                            .build();
     checkCUDNN(variantPack.get_status());
 
-    auto ret =
-        cudnnBackendExecute(cudnn, plan_desc, variantPack.get_raw_desc());
-    checkCUDNN(ret);
+    auto cudnn_execute = [&](int steps) {
+      for (int i = 0; i < steps; i++) {
+        auto ret =
+            cudnnBackendExecute(cudnn, plan_desc, variantPack.get_raw_desc());
+        checkCUDNN(ret);
+      }
+    };
+
+    int kWarmupCount = 10;
+    int kBenchmarkCount = 10;
+    const char* env_p = std::getenv("PRINTALL");
+    if (env_p && (strcmp(env_p, "1") == 0 || strcmp(env_p, "true") == 0)) {
+      kWarmupCount = 0;
+      kBenchmarkCount = 1;
+    }
+
+    cudnn_execute(kWarmupCount);
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start);
+
+    cudnn_execute(kBenchmarkCount);
+    
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Execution time(ms): %f\n", milliseconds / kBenchmarkCount);
   }
 };
