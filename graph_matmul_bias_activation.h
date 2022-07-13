@@ -9,8 +9,8 @@ GetMatMulBiasTanhGraph(MatMulOpts& opts, cudnnHandle_t& cudnn) {
   // MatMul + BiasAdd + Tanh. Therefore, we need to build a graph of the
   // four ops with their input/output tensor edges:
   // MatMul : input: tensor_a, tensor_b;      output: tensor_matmul (virtual)
-  // BiasAdd: input: tensor_matmul; output: tensor_bias (virtual)
-  // Tanh   : input: tensor_bias;   output: tensor_c
+  // BiasAdd: input: tensor_matmul, tensor_z; output: tensor_bias (virtual)
+  // Tanh   : input: tensor_bias;             output: tensor_c
 
   ASSIGN_OR_RETURN(auto tensor_a,
                    CreateCudnnTensor(opts.input0_dims, opts.input0_strides,
