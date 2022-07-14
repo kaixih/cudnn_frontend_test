@@ -9,7 +9,8 @@ GetConvBiasEluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
   // Conv + BiasAdd + Elu. Therefore, we need to build a graph of the
   // four ops with their input/output tensor edges:
   // Conv   : input: tensor_x, tensor_w;     output: tensor_conv (virtual)
-  // BiasAdd: input: tensor_conv, tensor_b;  output: tensor_bias (virtual)
+  // Add    : input: tensor_conv, tensor_z;  output: tensor_add  (virtual)
+  // BiasAdd: input: tensor_add, tensor_b;   output: tensor_bias (virtual)
   // Elu    : input: tensor_bias;            output: tensor_y
 
   ASSIGN_OR_RETURN(auto tensor_x,
@@ -21,6 +22,11 @@ GetConvBiasEluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
                    CreateCudnnTensor(opts.output_dims, opts.output_strides,
                                      opts.num_dims + 2, 'y', opts.data_type),
                    "Failed to build tensor y");
+
+  ASSIGN_OR_RETURN(auto tensor_z,
+                   CreateCudnnTensor(opts.output_dims, opts.output_strides,
+                                     opts.num_dims + 2, 'z', opts.data_type),
+                   "Failed to build tensor z");
 
   ASSIGN_OR_RETURN(auto tensor_w,
                    CreateCudnnTensor(opts.filter_dims, opts.filter_strides,
@@ -62,8 +68,10 @@ GetConvBiasEluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
   std::vector<Node> nodes = {
       {"convolution", accumulator_type, &conv_desc, {1., 0.},
          /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+      {"add", accumulator_type, nullptr, {1., 0.},
+         /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_z}, {"y", ""}}},
       {"bias_add", accumulator_type, nullptr, {},
-         /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
+         /*ports=*/{{"x", "add:y"}, {"b", &tensor_b}, {"y", ""}}},
       {"elu", activation_type, &elu_desc, {},
          /*ports=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
   // clang-format on

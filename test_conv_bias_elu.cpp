@@ -72,9 +72,9 @@ int main(int argc, char** argv) {
     print_fn(b_ptr, opts.bias_size(), "### Bias Before:");
   }
 
-  int64_t uids[] = {'x', 'w', 'b', 'y'};
-  auto launcher = LaunchRunner<void*, void*, void*, void*>();
-  launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, b_ptr, y_ptr);
+  int64_t uids[] = {'x', 'w', 'z', 'b', 'y'};
+  auto launcher = LaunchRunner<void*, void*, void*, void*, void*>();
+  launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, y_ptr, b_ptr, y_ptr);
 
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {
