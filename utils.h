@@ -1,17 +1,20 @@
 template <typename T>
-void InitDeviceTensor(void** d_ptr, size_t n, std::function<float()> init_fn) {
+void InitDeviceTensor(void** d_ptr, size_t n,
+                      std::function<float(int)> init_fn) {
   checkCUDA(cudaMalloc(d_ptr, n * sizeof(T)));
   T* h_ptr = new T[n];
   for (size_t i = 0; i < n; i++) {
-    h_ptr[i] = static_cast<T>(init_fn());
+    h_ptr[i] = static_cast<T>(init_fn(i));
   }
   checkCUDA(cudaMemcpy(*d_ptr, h_ptr, sizeof(T) * n, cudaMemcpyHostToDevice));
   delete[] h_ptr;
 }
 
 // Some predefined initialization functions.
-float InitOnes() { return 1.f; }
-float InitRandoms() { return static_cast<float>(rand()) / RAND_MAX; }
+float InitOnes(int i) { return 1.f; }
+float InitZeros(int i) { return 0.f; }
+float InitRandoms(int i) { return static_cast<float>(rand()) / RAND_MAX; }
+float InitSeq(int i) { return static_cast<float>(i); }
 
 template <typename T>
 void PrintDeviceTensor(void* d_ptr, size_t n, const std::string& prompt) {
@@ -71,15 +74,24 @@ void ComputeStrides(ConvOpts& opts, int data_format) {
 }
 
 void ComputeStrides(MatMulOpts& opts) {
-  auto compute_strides = [&](const int64_t* dims, int64_t* strides) {
-    int tensor_dims = opts.num_dims;
-    strides[tensor_dims - 1] = 1;
-    for (int64_t d = tensor_dims - 2; d >= 0; d--) {
-      strides[d] = strides[d + 1] * dims[d + 1];
+  auto compute_strides = [&](const int64_t* dims, int64_t* strides,
+                             int64_t transpose = 0) {
+    if (transpose == 0) {
+      int tensor_dims = opts.num_dims;
+      strides[tensor_dims - 1] = 1;
+      for (int64_t d = tensor_dims - 2; d >= 0; d--) {
+        strides[d] = strides[d + 1] * dims[d + 1];
+      }
+    } else {
+      int tensor_dims = opts.num_dims;
+      strides[1] = 1;
+      // For transposed access, dims[1] becomes the leading dim.
+      strides[tensor_dims - 1] = strides[1] * dims[1];
+      strides[0] = strides[2] * dims[2];
     }
   };
-  compute_strides(opts.input0_dims, opts.input0_strides);
-  compute_strides(opts.input1_dims, opts.input1_strides);
+  compute_strides(opts.input0_dims, opts.input0_strides, opts.transpose0);
+  compute_strides(opts.input1_dims, opts.input1_strides, opts.transpose1);
   compute_strides(opts.output_dims, opts.output_strides);
   compute_strides(opts.bias_dims, opts.bias_strides);
 }
@@ -163,13 +175,18 @@ std::optional<MatMulOpts> ParseMatMulOpts(int argc, char** argv) {
     std::string bias_dims = "1,1,32";
     int data_type = 1;
     int act_kind = 0;
+    bool transpose0 = 0;
+    bool transpose1 = 0;
   };
   auto parser = CmdOpts<CmdMatMulOpts>::Create(
       {{"--input0", &CmdMatMulOpts::input0_dims},
        {"--input1", &CmdMatMulOpts::input1_dims},
        {"--bias", &CmdMatMulOpts::bias_dims},
        {"--data_type", &CmdMatMulOpts::data_type},
-       {"--act_kind", &CmdMatMulOpts::act_kind}});
+       {"--act_kind", &CmdMatMulOpts::act_kind},
+       {"--transpose0", &CmdMatMulOpts::transpose0},
+       {"--transpose1", &CmdMatMulOpts::transpose1},
+       });
   auto parsed_opts = parser->parse(argc, argv);
   if (!(parsed_opts.data_type >= 0 && parsed_opts.data_type <= 1)) {
     std::cout << "!!! --data_type: 0=float, 1=half, but we got "
@@ -201,6 +218,8 @@ std::optional<MatMulOpts> ParseMatMulOpts(int argc, char** argv) {
     return {};
   }
   ComputeOutputDims(opts);
+  opts.transpose0 = parsed_opts.transpose0;
+  opts.transpose1 = parsed_opts.transpose1;
   ComputeStrides(opts);
   opts.data_type = parsed_opts.data_type;
   opts.act_kind = parsed_opts.act_kind;
@@ -267,4 +286,6 @@ void PrintMatMulOpts(MatMulOpts& opts) {
   print_ints(opts.output_strides, opts.num_dims, "output_strides");
   print_ints(&opts.data_type, 1, "data_type(0=float,1=half)");
   print_ints(&opts.act_kind, 1, "act_kind(0=tanh,1=sigmoid)");
+  print_ints(&opts.transpose0, 1, "transpose0");
+  print_ints(&opts.transpose1, 1, "transpose1");
 }

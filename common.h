@@ -41,8 +41,9 @@
     cudnnStatus_t _status = (expr).get_status();                        \
     if (!(_status == CUDNN_STATUS_SUCCESS)) {                           \
       std::ostringstream oss;                                           \
-      oss << CudnnStatusToString(_status) << "\nin " << __FILE__ << "(" \
-          << __LINE__ << "): '" << #expr << "' " << (expr).get_error(); \
+      std::cout << CudnnStatusToString(_status) << "\nin "              \
+          << __FILE__ << "(" << __LINE__ << "): '" << #expr << "' "     \
+          << (expr).get_error() << std::endl;                           \
       return {};                                                        \
     }                                                                   \
   } while (false)
@@ -95,6 +96,8 @@ struct MatMulOpts {
   int64_t bias_strides[5];
   int64_t data_type;
   int64_t act_kind;
+  int64_t transpose0;
+  int64_t transpose1;
 
   int64_t input0_size() {
     return std::accumulate(input0_dims, input0_dims + num_dims, 1,

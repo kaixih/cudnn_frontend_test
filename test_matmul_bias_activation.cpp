@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
   void* b_ptr;
   void* c_ptr;
   void* z_ptr;
-  void (*init_fn)(void** d_ptr, size_t n, std::function<float()> init_fn);
+  void (*init_fn)(void** d_ptr, size_t n, std::function<float(int)> init_fn);
   void (*print_fn)(void* d_ptr, size_t n, const std::string& prompt);
   if (opts.data_type == 0) {
     init_fn = InitDeviceTensor<float>;
@@ -73,10 +73,11 @@ int main(int argc, char** argv) {
     print_fn = PrintDeviceTensor<__half>;
   }
 
+  srand(12);
   init_fn(&a_ptr, opts.input0_size(), InitRandoms);
   init_fn(&b_ptr, opts.input1_size(), InitRandoms);
   init_fn(&c_ptr, opts.output_size(), InitRandoms);
-  init_fn(&z_ptr, opts.bias_size(), InitRandoms);
+  init_fn(&z_ptr, opts.bias_size(), InitZeros);
 
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {
