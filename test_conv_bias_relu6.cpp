@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
   void* y_ptr;
   void* zero_ptr;
   void* six_ptr;
-  void (*init_fn)(void** d_ptr, size_t n, std::function<float()> init_fn);
+  void (*init_fn)(void** d_ptr, size_t n, std::function<float(int)> init_fn);
   void (*print_fn)(void* d_ptr, size_t n, const std::string& prompt);
   if (opts.data_type == 0) {
     init_fn = InitDeviceTensor<float>;
