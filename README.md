@@ -124,31 +124,49 @@ Note, in practice, one might want to sweep through all the engines, checking
 their notes, and then pick up the fastest one.
 
 ```
-$ ./test_conv.out --input 8,64,128,128,128 --filter 32,64,3,3,3 --data_format 1 \
- --data_type 1 --engine_index 0
+$ make test_conv.out
+$ ./test_conv.out --input 8,64,128,128 --filter 32,64,3,3 --data_format 1 \
+ --data_type 1 --engine_index 0 --conv_kind 0
 >>> CONVOLUTION:
->>>   num_dims: 3,
->>>   input_dims: 8, 64, 128, 128, 128,
->>>   filter_dims: 32, 64, 3, 3, 3,
->>>   output_dims: 8, 32, 128, 128, 128,
->>>   input_strides: 134217728, 1, 1048576, 8192, 64,
->>>   filter_strides: 1728, 1, 576, 192, 64,
->>>   output_strides: 67108864, 1, 524288, 4096, 32,
->>>   paddings: 1, 1, 1,
->>>   strides: 1, 1, 1,
->>>   dilations: 1, 1, 1,
+>>>   num_dims: 2,
+>>>   input_dims: 8, 64, 128, 128,
+>>>   filter_dims: 32, 64, 3, 3,
+>>>   bias_dims: 1, 8, 1, 1,
+>>>   output_dims: 8, 32, 128, 128,
+>>>   input_strides: 1048576, 1, 8192, 64,
+>>>   filter_strides: 576, 1, 192, 64,
+>>>   bias_strides: 8, 1, 8, 8,
+>>>   output_strides: 524288, 1, 4096, 32,
+>>>   paddings: 1, 1,
+>>>   strides: 1, 1,
+>>>   dilations: 1, 1,
 >>>   data_type(0=float,1=half): 1,
 >>>   data_format(0=nchw,1=nhwc): 1,
 >>>   conv_kind(0=fwd,1=bwd_filter,2=bwd_input): 0,
+>>>   act_kind(leakyrelu:0=clip,1=max,2=sel;relu6:0=clip,1=min): 0,
 
 Filtered engine configs size: 43
-Adding engine (0): ConvFwd_eng16_k2=16_k13=0_k14=0_k18=0_k23=0
+Adding engine (0): ConvFwd_eng16_k2=2_k13=0_k14=0_k18=0_k23=0
   Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
-Adding engine (1): ConvFwd_eng16_k2=16_k13=0_k14=0_k18=1_k23=0
+Adding engine (1): ConvFwd_eng16_k2=2_k13=0_k14=0_k18=0_k23=2
   Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+Adding engine (2): ConvFwd_eng16_k2=2_k13=0_k14=0_k18=1_k23=0
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+Adding engine (3): ConvFwd_eng16_k2=8_k13=1_k14=0_k18=0_k23=0
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+Adding engine (4): ConvFwd_eng16_k2=16_k13=0_k14=0_k18=0_k23=0
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+Adding engine (5): ConvFwd_eng16_k2=16_k13=0_k14=0_k18=1_k23=0
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+Adding engine (6): ConvFwd_eng16_k2=16_k13=0_k14=0_k18=0_k23=2
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+Adding engine (7): ConvFwd_eng8_k2=4_k4=1_k5=3_k6=3_k7=2_k19=0
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+  Workspace Bytes: 135296
 ...
-Returned execution plans size: 42
-Using (0): ConvFwd_eng16_k2=16_k13=0_k14=0_k18=0_k23=0
+Returned execution plans size: 43
+Using (0): ConvFwd_eng16_k2=2_k13=0_k14=0_k18=0_k23=0
+Execution time(ms): 0.118477
 >>> Convolution Finished.
 ```
 
@@ -157,33 +175,90 @@ For *the fused convolution graph*, we simply change the target to
 required for the test. For example, we can see the `ConvFwd_Add_Add_ReluFwd`
 engines are returned when we add `--bias` option.
 ```
-$ ./test_conv_add_bias_relu.out --input 8,64,128,128,128 --filter 32,64,3,3,3 \
-  --bias 1,32,1,1,1 --data_format 1 --data_type 1 --engine_index 0
+$ make test_conv_add_bias_relu.out
+$ ./test_conv_add_bias_relu.out --input 8,64,128,128 --filter 32,64,3,3 \
+  --bias 1,32,1,1 --data_format 1 --data_type 1 --engine_index 0
 >>> CONVOLUTION:
->>>   num_dims: 3,
->>>   input_dims: 8, 64, 128, 128, 128,
->>>   filter_dims: 32, 64, 3, 3, 3,
->>>   bias_dims: 1, 32, 1, 1, 1,
->>>   output_dims: 8, 32, 128, 128, 128,
->>>   input_strides: 134217728, 1, 1048576, 8192, 64,
->>>   filter_strides: 1728, 1, 576, 192, 64,
->>>   bias_strides: 32, 1, 32, 32, 32,
->>>   output_strides: 67108864, 1, 524288, 4096, 32,
->>>   paddings: 1, 1, 1,
->>>   strides: 1, 1, 1,
->>>   dilations: 1, 1, 1,
+>>>   num_dims: 2,
+>>>   input_dims: 8, 64, 128, 128,
+>>>   filter_dims: 32, 64, 3, 3,
+>>>   bias_dims: 1, 32, 1, 1,
+>>>   output_dims: 8, 32, 128, 128,
+>>>   input_strides: 1048576, 1, 8192, 64,
+>>>   filter_strides: 576, 1, 192, 64,
+>>>   bias_strides: 32, 1, 32, 32,
+>>>   output_strides: 524288, 1, 4096, 32,
+>>>   paddings: 1, 1,
+>>>   strides: 1, 1,
+>>>   dilations: 1, 1,
 >>>   data_type(0=float,1=half): 1,
 >>>   data_format(0=nchw,1=nhwc): 1,
 >>>   conv_kind(0=fwd,1=bwd_filter,2=bwd_input): 0,
+>>>   act_kind(leakyrelu:0=clip,1=max,2=sel;relu6:0=clip,1=min): 0,
 
-Filtered engine configs size: 39
-Adding engine (0): ConvFwd_Add_Add_ReluFwd_eng8_k2=16_k13=0_k14=0_k18=0_k23=0
+Filtered engine configs size: 42
+Adding engine (0): ConvFwd_Add_Add_ReluFwd_eng8_k2=2_k13=0_k14=0_k18=0_k23=0
   Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
-Adding engine (1): ConvFwd_Add_Add_ReluFwd_eng8_k2=16_k13=0_k14=0_k18=1_k23=0
+Adding engine (1): ConvFwd_Add_Add_ReluFwd_eng8_k2=2_k13=0_k14=0_k18=0_k23=2
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+Adding engine (2): ConvFwd_Add_Add_ReluFwd_eng8_k2=2_k13=0_k14=0_k18=1_k23=0
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+Adding engine (3): ConvFwd_Add_Add_ReluFwd_eng8_k2=8_k13=1_k14=0_k18=0_k23=0
   Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
 ...
-Returned execution plans size: 38
-Using (0): ConvFwd_Add_Add_ReluFwd_eng8_k2=16_k13=0_k14=0_k18=0_k23=0
+
+Returned execution plans size: 35
+Using (0): ConvFwd_Add_Add_ReluFwd_eng8_k2=2_k13=0_k14=0_k18=0_k23=0
+Execution time(ms): 0.118886
 >>> Convolution Finished.
+```
+
+Test the cudnn runtime matmul fusion:
+```
+$ make test_matmul_bias_activation.out
+$ ./test_matmul_bias_activation.out --act_kind 1 --input0 1,8,16 \
+  --input1 1,16,32 --bias 1,1,32 --data_type 1
+>>> MATRIX MULTIPLICATION:
+>>>   num_dims: 3,
+>>>   input0_dims: 1, 8, 16,
+>>>   input1_dims: 1, 16, 32,
+>>>   bias_dims: 1, 1, 32,
+>>>   output_dims: 1, 8, 32,
+>>>   input0_strides: 128, 16, 1,
+>>>   input1_strides: 512, 32, 1,
+>>>   bias_strides: 32, 32, 1,
+>>>   output_strides: 256, 32, 1,
+>>>   data_type(0=float,1=half): 1,
+>>>   act_kind(0=tanh,1=sigmoid): 1,
+>>>   transpose0: 0,
+>>>   transpose1: 0,
+
+Filtered engine configs size: 7
+Adding engine (0): Matmul_Add_SigmoidFwd_eng0_k24=3
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+  Behavior Notes: CUDNN_BEHAVIOR_NOTE_RUNTIME_COMPILATION,
+qAdding engine (1): Matmul_Add_SigmoidFwd_eng0_k24=1
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+  Behavior Notes: CUDNN_BEHAVIOR_NOTE_RUNTIME_COMPILATION,
+Adding engine (2): Matmul_Add_SigmoidFwd_eng0_k24=0
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+  Behavior Notes: CUDNN_BEHAVIOR_NOTE_RUNTIME_COMPILATION,
+Adding engine (3): Matmul_Add_SigmoidFwd_eng0_k24=4
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+  Behavior Notes: CUDNN_BEHAVIOR_NOTE_RUNTIME_COMPILATION,
+Adding engine (4): Matmul_Add_SigmoidFwd_eng0_k24=5
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+  Behavior Notes: CUDNN_BEHAVIOR_NOTE_RUNTIME_COMPILATION,
+Adding engine (5): Matmul_Add_SigmoidFwd_eng0_k24=2
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+  Behavior Notes: CUDNN_BEHAVIOR_NOTE_RUNTIME_COMPILATION,
+Adding engine (6): Matmul_Add_SigmoidFwd_eng0
+  Numeric Notes: CUDNN_NUMERICAL_NOTE_TENSOR_CORE,
+  Behavior Notes: CUDNN_BEHAVIOR_NOTE_RUNTIME_COMPILATION,
+
+Returned execution plans size: 7
+Using (0): Matmul_Add_SigmoidFwd_eng0_k24=3
+Execution time(ms): 0.011366
+>>> MatMul Finished.
 ```
 
