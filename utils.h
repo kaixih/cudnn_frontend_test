@@ -285,7 +285,7 @@ void PrintMatMulOpts(MatMulOpts& opts) {
   print_ints(opts.bias_strides, opts.num_dims, "bias_strides");
   print_ints(opts.output_strides, opts.num_dims, "output_strides");
   print_ints(&opts.data_type, 1, "data_type(0=float,1=half)");
-  print_ints(&opts.act_kind, 1, "act_kind(0=tanh,1=sigmoid)");
+  print_ints(&opts.act_kind, 1, "act_kind(0=tanh,1=sigmoid,2=gelu_exact)");
   print_ints(&opts.transpose0, 1, "transpose0");
   print_ints(&opts.transpose1, 1, "transpose1");
 }

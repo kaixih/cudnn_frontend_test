@@ -33,8 +33,10 @@ int main(int argc, char** argv) {
     fn_graph = GetMatMulBiasTanhGraph;
   } else if (opts.act_kind == 1) {
     fn_graph = GetMatMulBiasSigmoidGraph;
+  } else if (opts.act_kind == 2) {
+    fn_graph = GetMatMulBiasGeluGraph;
   } else {
-    std::cout << "!!! This test only supports --act_kind 0|1." << std::endl;
+    std::cout << "!!! This test only supports --act_kind 0|1|2." << std::endl;
     return {};
   }
 

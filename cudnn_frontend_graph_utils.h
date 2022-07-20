@@ -134,6 +134,8 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
       pw_desc_builder.setMode(CUDNN_POINTWISE_TANH_FWD);
     } else if (node.op_name == "sigmoid") {
       pw_desc_builder.setMode(CUDNN_POINTWISE_SIGMOID_FWD);
+    } else if (node.op_name == "gelu_exact") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_GELU_FWD);
     } else {
       std::cout << "!!! cannot create desc for " << node.op_name << std::endl;
       return {};

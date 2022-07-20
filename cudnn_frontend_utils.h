@@ -1,6 +1,13 @@
 #include <cudnn_frontend.h>
+#include <sys/time.h>
 
 #include "cudnn_utils.h"
+
+uint64_t CpuTimer() {
+  timeval tv;
+  gettimeofday(&tv, 0);
+  return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+}
 
 std::optional<cudnn_frontend::Tensor> CreateCudnnTensor(
     const int64_t* dims, const int64_t* strides, int n, int64_t uid, int dtype,
@@ -169,13 +176,16 @@ void CreateOpRunners(
 
   out_runners->clear();
   for (int i = 0; i < filtered_configs.size(); i++) {
+    uint64_t t0 = CpuTimer();
     auto plan = cudnn_frontend::ExecutionPlanBuilder()
                     .setHandle(cudnn)
                     .setEngineConfig(filtered_configs[i], op_graph->getTag())
                     .build();
+    uint64_t t1 = CpuTimer();
     if (plan.get_status() != CUDNN_STATUS_SUCCESS) {
       continue;
     }
+    std::cout << "Compilation time (ms): " << t1 - t0 << std::endl;
 
     if (maybe_json_handle_static &&
         cudnn_frontend::check_errata(*maybe_json_handle_static, plan.getTag(),
