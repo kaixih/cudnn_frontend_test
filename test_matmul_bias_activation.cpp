@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
   }
 
   ASSIGN_OR_RETURN(auto op_graph, fn_graph(opts, cudnn),
-                   "Failed to build the MatMulBiasTanh graph.");
+                   "Failed to build the MatMulBiasAct graph.");
   std::vector<std::unique_ptr<cudnn_frontend::ExecutionPlan>> plans;
   CreateOpRunners(cudnn, std::move(op_graph), &plans);
 
