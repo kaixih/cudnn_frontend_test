@@ -63,9 +63,7 @@ GetConvAddBiasReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
       {"add", accumulator_type, nullptr, {1., 0.},
          /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_z}, {"y", ""}}},
       {"bias_add", accumulator_type, nullptr, {},
-         /*ports=*/{{"x", "add:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"relu", activation_type, nullptr, {},
-         /*ports=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
+         /*ports=*/{{"x", "add:y"}, {"b", &tensor_b}, {"y", &tensor_y}}}};
   // clang-format on
 
   return CreateOpGraph(cudnn, nodes);
