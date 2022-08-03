@@ -79,8 +79,8 @@ int main(int argc, char** argv) {
   init_fn(&f_ptr, opts.filter_size(), InitRandoms);
   init_fn(&b_ptr, opts.bias_size(), InitRandoms);
   init_fn(&y_ptr, opts.output_size(), InitRandoms);
-  init_fn(&zero_ptr, 1, [](){ return 0.f; });
-  init_fn(&six_ptr, 1, [](){ return 6.f; });
+  init_fn(&zero_ptr, 1, [](int i){ return 0.f; });
+  init_fn(&six_ptr, 1, [](int i){ return 6.f; });
 
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {
