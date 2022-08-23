@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
 
   int64_t uids[] = {'x', 'w', 'z', 'b', 'y'};
   auto launcher = LaunchRunner<void*, void*, void*, void*, void*>();
-  launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, y_ptr, b_ptr, y_ptr);
+  launcher(cudnn, plan_desc, ws_ptr, uids, x_ptr, f_ptr, nullptr, b_ptr, y_ptr);
 
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {
