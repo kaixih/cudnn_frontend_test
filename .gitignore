@@ -32,4 +32,4 @@
 *.app
 
 # IDE files
-.vscode/*
+.vscode/
