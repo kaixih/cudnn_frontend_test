@@ -26,6 +26,7 @@ which are roughly based on the pattern `[Conv|MatMul]+Bias+Activation` (listed
 $ make run_conv_graphs.out
 $ make run_matmul_graphs.out
 ```
+Note, the repo requires the cuDNN 8.5+ and tested with cuDNN frontend v0.7.
 ## Run Convolution Graphs
 The example below displays the `Conv-Bias-Elu` graph is executed with specified
 convolution shapes, the fp16 inputs/outputs, and the channels_last data format.
