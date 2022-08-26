@@ -211,7 +211,7 @@ MatMulOpts ParseMatMulOpts(int argc, char** argv) {
 
   auto parser = CmdOpts<CmdMatMulOpts>::Create(
       {{"-a", &CmdMatMulOpts::a_dims},
-       {"-b", &CmdMatMulOpts::a_dims},
+       {"-b", &CmdMatMulOpts::b_dims},
        {"-bias", &CmdMatMulOpts::bias_dims},
        {"-transpose_a", &CmdMatMulOpts::transpose_a},
        {"-transpose_b", &CmdMatMulOpts::transpose_b},
