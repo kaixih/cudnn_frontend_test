@@ -60,7 +60,8 @@ Execution time(ms): 0.288051
 >>> Convolution Finished.
 ```
 ## Run MatMul Graphs
-Similarly, the following example shows a matmul graph of MatMul-Bias-GeluExact.
+Similarly, the following example shows a matmul graph of
+`MatMul-Bias-GeluExact`.
 ```
 $ ./run_matmul_graphs.out -a 1,8,16 -b 1,16,32 -bias 1,1,32 -data_type 1 -data_format 1 -engine_index 4 -graph_index 102
 >>> Retrieved MatMul specs:
