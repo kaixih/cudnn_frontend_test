@@ -1,15 +1,24 @@
-INCLUDES = -I cudnn-frontend/include/
-CPPFLAGS = $(INCLUDES) -DNV_CUDNN_DISABLE_EXCEPTION -lcudnn -std=c++17
+INCLUDES = -I cudnn-frontend/include/ -I src/
+CPPFLAGS = $(INCLUDES) -DNV_CUDNN_DISABLE_EXCEPTION -std=c++17
+LDFLAGS = -lcudnn
 CXX = nvcc
+HEADERS = $(wildcard src/*.h)
+SOURCES = $(wildcard src/*.cc)
 
-SRCS := $(wildcard test_*.cpp)
-OBJS = $(SRCS:.cpp=.out)
+EXEC = run_conv_graphs.out run_matmul_graphs.out
+OBJECTS = $(SOURCES:.cc=.o)
 
-all: $(OBJS)
+all: ${EXEC}
 
-$(OBJS): %.out: %.cpp
-	${CXX} ${CPPFLAGS} -o $@ $<
+%.o: %.cc ${HEADERS}
+	${CXX} ${CPPFLAGS} -c -o $@ $<
+
+run_conv_graphs.out: samples/run_conv_graphs.cc ${OBJECTS}
+	${CXX} ${CPPFLAGS} ${LDFLAGS} -o $@ $^
+
+run_matmul_graphs.out: samples/run_matmul_graphs.cc ${OBJECTS}
+	${CXX} ${CPPFLAGS} ${LDFLAGS} -o $@ $^
 
 clean:
-	rm -rf *.out
+	rm -rf ${EXEC} ${OBJECTS}
 

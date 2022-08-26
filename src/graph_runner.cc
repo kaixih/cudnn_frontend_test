@@ -1,8 +1,8 @@
-#include <cudnn_frontend.h>
+#include "graph_runner.h"
+
 #include <sys/time.h>
 
-#include "cudnn_utils.h"
-
+namespace {
 uint64_t CpuTimer() {
   timeval tv;
   gettimeofday(&tv, 0);
@@ -96,11 +96,11 @@ void DisplayNumericNotes(
       CUDNN_TYPE_NUMERICAL_NOTE, CUDNN_NUMERICAL_NOTE_TYPE_COUNT, &elem_count,
       notes));
   if (elem_count != 0) {
-    std::cout << "  Numeric Notes: ";
+    printf("  Numeric Notes: ");
     for (int i = 0; i < elem_count; i++) {
-      std::cout << CudnnStatusToString(notes[i]) << ", ";
+      printf("%s, ", CudnnNumericalNoteToString(notes[i]).c_str());
     }
-    std::cout << std::endl;
+    printf("\n");
   }
 }
 
@@ -124,13 +124,14 @@ void DisplayBehaviorNotes(
       CUDNN_TYPE_BEHAVIOR_NOTE, CUDNN_BEHAVIOR_NOTE_TYPE_COUNT, &elem_count,
       notes));
   if (elem_count != 0) {
-    std::cout << "  Behavior Notes: ";
+    printf("  Behavior Notes: ");
     for (int i = 0; i < elem_count; i++) {
-      std::cout << CudnnStatusToString(notes[i]) << ", ";
+      printf("%s, ", CudnnBehaviorNoteToString(notes[i]).c_str());
     }
-    std::cout << std::endl;
+    printf("\n");
   }
 }
+}  // namespace
 
 void CreateOpRunners(
     cudnnHandle_t& cudnn,
@@ -148,27 +149,25 @@ void CreateOpRunners(
       cudnn_frontend::get_heuristics_list<2>(
           {"heuristics_mode_b", "heuristics_fallback"}, *op_graph,
           generic_filter_fn, filtered_configs, /*evaluate_all=*/false);
-  for (auto &status : heuristics_statuses) {
+  for (auto& status : heuristics_statuses) {
     if (status != CUDNN_STATUS_SUCCESS) {
       // The mode_b is supposed to fallback to mode_a if it cannot support
       // things. We need this feature esp. for the runtime fusion engines.
       // However, there is a known issue for this. So, we manually do that here.
       // TODO(kaixih): fix this when cudnn fixes it.
-      heuristics_statuses =
-      cudnn_frontend::get_heuristics_list<2>(
+      heuristics_statuses = cudnn_frontend::get_heuristics_list<2>(
           {"heuristics_mode_a", "heuristics_fallback"}, *op_graph,
           generic_filter_fn, filtered_configs, /*evaluate_all=*/false);
-      for (auto &status : heuristics_statuses) {
+      for (auto& status : heuristics_statuses) {
         if (status != CUDNN_STATUS_SUCCESS) {
-          std::cout << "!!! cuDNN's get_heuristics_list error" << std::endl;;  
+          printf(RED "!!! cuDNN's get_heuristics_list error\n" RESET);
           return;
         }
       }
     }
   }
 
-  std::cout << "\nFiltered engine configs size: " << filtered_configs.size()
-            << std::endl;
+  printf("\nFiltered engine configs size: %ld\n", filtered_configs.size());
 
   auto fn = []() { return true; };
   auto maybe_json_handle_static = CudnnExecutionPlanEngineFilterStatic();
@@ -185,80 +184,33 @@ void CreateOpRunners(
     if (plan.get_status() != CUDNN_STATUS_SUCCESS) {
       continue;
     }
-    std::cout << "Compilation time (ms): " << t1 - t0 << std::endl;
+    printf("Compilation time (ms): %lu\n", t1 - t0);
 
     if (maybe_json_handle_static &&
         cudnn_frontend::check_errata(*maybe_json_handle_static, plan.getTag(),
                                      cudnn, fn)) {
-      std::cout << "Exclude engine (static): " << plan.getTag() << std::endl;
+      printf("Exclude engine (static): %s\n", plan.getTag().c_str());
       continue;
     }
     if (maybe_json_handle_runtime &&
         cudnn_frontend::check_errata(*maybe_json_handle_runtime, plan.getTag(),
                                      cudnn, fn)) {
-      std::cout << "Exclude engine (runtime): " << plan.getTag() << std::endl;
+      printf("Exclude engine (runtime): %s\n", plan.getTag().c_str());
       continue;
     }
 
-    std::cout << "Adding engine (" << out_runners->size()
-              << "): " << plan.getTag() << std::endl;
+    printf("Adding engine (%ld): %s\n", out_runners->size(),
+           plan.getTag().c_str());
 
     DisplayNumericNotes(filtered_configs[i]);
     DisplayBehaviorNotes(filtered_configs[i]);
     if (plan.getWorkspaceSize()) {
-      std::cout << "  Workspace Bytes: " << plan.getWorkspaceSize()
-                << std::endl;
+      printf("  Workspace Bytes: %ld\n", plan.getWorkspaceSize());
     }
 
     out_runners->push_back(std::unique_ptr<cudnn_frontend::ExecutionPlan>(
         new cudnn_frontend::ExecutionPlan(std::move(plan))));
   }
 
-  std::cout << "\nReturned execution plans size: " << out_runners->size()
-            << std::endl;
+  printf("\nReturned execution plans size: %ld\n", out_runners->size());
 }
-
-template <typename... Args>
-struct LaunchRunner {
-  void operator()(cudnnHandle_t& cudnn, cudnnBackendDescriptor_t& plan_desc,
-                  void* ws_ptr, const int64_t* uids, Args... args) {
-    std::array<void*, sizeof...(Args)> data_ptrs = {args...};
-    auto variantPack = cudnn_frontend::VariantPackBuilder()
-                           .setWorkspacePointer(ws_ptr)
-                           .setDataPointers(data_ptrs.size(), data_ptrs.data())
-                           .setUids(data_ptrs.size(), uids)
-                           .build();
-    checkCUDNN(variantPack.get_status());
-
-    auto cudnn_execute = [&](int steps) {
-      for (int i = 0; i < steps; i++) {
-        auto ret =
-            cudnnBackendExecute(cudnn, plan_desc, variantPack.get_raw_desc());
-        checkCUDNN(ret);
-      }
-    };
-
-    int kWarmupCount = 10;
-    int kBenchmarkCount = 10;
-    const char* env_p = std::getenv("PRINTALL");
-    if (env_p && (strcmp(env_p, "1") == 0 || strcmp(env_p, "true") == 0)) {
-      kWarmupCount = 0;
-      kBenchmarkCount = 1;
-    }
-
-    cudnn_execute(kWarmupCount);
-
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start);
-
-    cudnn_execute(kBenchmarkCount);
-    
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
-    printf("Execution time(ms): %f\n", milliseconds / kBenchmarkCount);
-  }
-};

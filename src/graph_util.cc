@@ -1,34 +1,10 @@
-#include <cudnn_frontend.h>
+#include "graph_util.h"
 
-std::string CudnnStatusToString(cudnnStatus_t status);
-int GetConvAccumulatorType(int data_type);
-int GetConvActivationType(int data_type);
-void CreateOpRunners(
-    cudnnHandle_t& cudnn,
-    std::unique_ptr<cudnn_frontend::OperationGraph> op_graph,
-    std::vector<std::unique_ptr<cudnn_frontend::ExecutionPlan>>* out_runners);
-std::optional<cudnn_frontend::Tensor> CreateCudnnTensor(
-    const int64_t* dims, const int64_t* strides, int n, int64_t uid, int dtype,
-    bool is_virtual);
-cudnnBackendDescriptorType_t GetCudnnConvolutionType(int64_t kind);
-cudnnDataType_t ToCudnnDataType(int data_type);
+#include <cudnn.h>
 
-struct Edge {
-  std::optional<std::string> tensor_name;
-  std::optional<cudnn_frontend::Tensor*> tensor_ptr;
-  Edge() {}
-  Edge(const char* c) : tensor_name(c) {}
-  Edge(cudnn_frontend::Tensor* t) : tensor_ptr(t) {}
-};
+#include "util.h"
 
-struct Node {
-  std::string op_name;
-  int op_dtype;
-  cudnn_frontend::BackendDescriptor* desc;
-  std::vector<double> scales;
-  std::unordered_map<std::string, Edge> edges;
-};
-
+namespace {
 std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetConvolutionOp(
     Node& node, cudnnBackendDescriptorType_t& conv_kind,
     std::unordered_map<std::string, cudnn_frontend::Tensor*>& tensors) {
@@ -37,7 +13,8 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetConvolutionOp(
   cudnn_frontend::ConvDesc* conv_desc =
       reinterpret_cast<cudnn_frontend::ConvDesc*>(node.desc);
   if (conv_desc == nullptr) {
-    std::cout << "!!! convolution desc has to be provided!" << std::endl;
+    printf(RED
+           "!!! Graph error: convolution desc has to be specified!\n" RESET);
     return {};
   }
   op_builder.setcDesc(*conv_desc);
@@ -78,7 +55,7 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetMatMulOp(
   cudnn_frontend::MatMulDesc* matmul_desc =
       reinterpret_cast<cudnn_frontend::MatMulDesc*>(node.desc);
   if (matmul_desc == nullptr) {
-    std::cout << "!!! matmul desc has to be provided!" << std::endl;
+    printf(RED "!!! Graph error: matmul desc has to be specified!\n" RESET);
     return {};
   }
   op_builder.setmatmulDesc(*matmul_desc);
@@ -110,7 +87,7 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
 
   auto pw_desc_builder = cudnn_frontend::PointWiseDescBuilder();
   if (pw_desc == nullptr) {
-    pw_desc_builder.setMathPrecision(ToCudnnDataType(node.op_dtype));
+    pw_desc_builder.setComputeType(ToCudnnDataType(node.op_dtype));
     if (node.op_name == "relu") {
       pw_desc_builder.setMode(CUDNN_POINTWISE_RELU_FWD);
     } else if (node.op_name == "bias_add" || node.op_name == "add") {
@@ -137,7 +114,8 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
     } else if (node.op_name == "gelu_exact") {
       pw_desc_builder.setMode(CUDNN_POINTWISE_GELU_FWD);
     } else {
-      std::cout << "!!! cannot create desc for " << node.op_name << std::endl;
+      printf(RED "!!! Graph error: failed to create desc for %s\n" RESET,
+             node.op_name.c_str());
       return {};
     }
     auto internal_pw_desc = pw_desc_builder.build();
@@ -170,9 +148,27 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
   return std::unique_ptr<cudnn_frontend::Operation>(
       new cudnn_frontend::Operation(std::move(op)));
 }
+}  // namespace
+
+std::optional<cudnn_frontend::Tensor> CreateCudnnTensor(const int64_t* dims,
+                                                        const int64_t* strides,
+                                                        int n, int64_t uid,
+                                                        int dtype,
+                                                        bool is_virtual) {
+  auto tensor = cudnn_frontend::TensorBuilder()
+                    .setDim(n, dims)
+                    .setStride(n, strides)
+                    .setId(uid)
+                    .setAlignment(32)
+                    .setDataType(ToCudnnDataType(dtype))
+                    .setVirtual(is_virtual)
+                    .build();
+  RETURN_MSG_IF_CUDNN_ERROR(tensor);
+  return tensor;
+}
 
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
-    cudnnHandle_t& cudnn, std::vector<Node> &nodes) {
+    cudnnHandle_t& cudnn, std::vector<Node>& nodes) {
   // There should be only one non-virtual tensor located in a port "y". We
   // simply use the output shape of it.
   int64_t ndims = -1;
@@ -190,8 +186,8 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
     }
   }
   if (nodes.size() > 1 && ndims == -1) {
-    std::cout << "!!! cannot find the output shape for creating virtual "
-              << "tensors." << std::endl;
+    printf(RED
+           "!!! Failed to find the output shape of virtual tensors.\n" RESET);
     return {};
   }
 
@@ -234,8 +230,8 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
       if (tensor_name_or.has_value() && tensor_name_or.value() != "") {
         auto found = tensors.find(tensor_name_or.value());
         if (found == tensors.end()) {
-          std::cout << "!!! Graph error: cannot find " << tensor_name_or.value()
-                    << std::endl;
+          printf(RED "!!! Graph error: failed to find %s\n" RESET,
+                 tensor_name_or.value().c_str());
           return {};
         }
         tensors[nodes[i].op_name + ":" + edge.first] = found->second;
@@ -246,16 +242,16 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
   std::vector<cudnn_frontend::Operation> built_ops;
   for (int i = 0; i < nodes.size(); i++) {
     if (nodes[i].op_name.find("convolution") != std::string::npos) {
-      int op_index;
+      cudnnBackendDescriptorType_t conv_kind;
       if (nodes[i].op_name == "convolution") {
-        op_index = 0;
+        conv_kind = CUDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR;
       } else if (nodes[i].op_name == "convolution_bwd_filter") {
-        op_index = 1;
+        conv_kind =
+            CUDNN_BACKEND_OPERATION_CONVOLUTION_BACKWARD_FILTER_DESCRIPTOR;
       } else if (nodes[i].op_name == "convolution_bwd_input") {
-        op_index = 2;
+        conv_kind =
+            CUDNN_BACKEND_OPERATION_CONVOLUTION_BACKWARD_DATA_DESCRIPTOR;
       }
-      cudnnBackendDescriptorType_t conv_kind =
-          GetCudnnConvolutionType(op_index);
       ASSIGN_OR_RETURN(auto op, GetConvolutionOp(nodes[i], conv_kind, tensors),
                        "Failed to build op " + nodes[i].op_name);
       built_ops.emplace_back(std::move(*op));
@@ -284,5 +280,3 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
   return std::unique_ptr<cudnn_frontend::OperationGraph>(
       new cudnn_frontend::OperationGraph(std::move(op_graph)));
 }
-
-
