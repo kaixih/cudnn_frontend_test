@@ -53,9 +53,9 @@ int main(int argc, char** argv) {
   void* y_ptr;
 
   init_fn(&x_ptr, opts.input_size(), InitRandoms);
-  init_fn(&f_ptr, opts.filter_size(), InitRandoms);
-  init_fn(&b_ptr, opts.bias_size(), InitRandoms);
-  init_fn(&y_ptr, opts.output_size(), InitRandoms);
+  init_fn(&f_ptr, opts.filter_size(), TenSeq);
+  init_fn(&b_ptr, opts.bias_size(), InitZeros);
+  init_fn(&y_ptr, opts.output_size(), OneSeq);
   checkCUDA(cudaDeviceSynchronize());
 
   bool print_on = IsPrintAll();
@@ -63,6 +63,7 @@ int main(int argc, char** argv) {
     print_fn(x_ptr, opts.input_size(), "### input:");
     print_fn(f_ptr, opts.filter_size(), "### filter:");
     print_fn(b_ptr, opts.bias_size(), "### bias:");
+    print_fn(y_ptr, opts.output_size(), "### output:");
   }
 
   switch (graph_index) {
@@ -98,6 +99,9 @@ int main(int argc, char** argv) {
 
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {
+    print_fn(x_ptr, opts.input_size(), "### input:");
+    print_fn(f_ptr, opts.filter_size(), "### filter:");
+    print_fn(b_ptr, opts.bias_size(), "### bias:");
     print_fn(y_ptr, opts.output_size(), "### output:");
   }
   printf(GREEN ">>> Convolution Finished.\n" RESET);

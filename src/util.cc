@@ -366,6 +366,8 @@ cudnnDataType_t GetConvActivationCudnnDataType(int data_type) {
   return CUDNN_DATA_FLOAT;
 }
 
+float OneSeq(int i) { return i + 1; }
+float TenSeq(int i) { return (i + 1) * 10; }
 float InitOnes(int i) { return 1.f; }
 float InitZeros(int i) { return 0.f; }
 float InitRandoms(int i) { return static_cast<float>(rand()) / RAND_MAX; }

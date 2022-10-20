@@ -144,6 +144,8 @@ cudnnDataType_t ToCudnnDataType(int data_type);
 cudnnDataType_t GetConvAccumulatorCudnnDataType(int data_type);
 cudnnDataType_t GetConvActivationCudnnDataType(int data_type);
 
+float OneSeq(int i);
+float TenSeq(int i);
 float InitOnes(int i);
 float InitZeros(int i);
 float InitRandoms(int i);
