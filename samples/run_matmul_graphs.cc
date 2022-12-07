@@ -66,7 +66,8 @@ int main(int argc, char** argv) {
     print_fn(z_ptr, opts.bias_size(), "### bias:");
   }
 
-  switch (graph_index) {
+  auto graph_type = static_cast<GraphType>(graph_index);
+  switch (graph_type) {
     case GraphType::MatMulBiasTanh:
     case GraphType::MatMulBiasSigmoid:
     case GraphType::MatMulBiasGeluExact: {

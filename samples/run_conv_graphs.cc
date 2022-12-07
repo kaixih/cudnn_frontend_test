@@ -65,7 +65,8 @@ int main(int argc, char** argv) {
     print_fn(b_ptr, opts.bias_size(), "### bias:");
   }
 
-  switch (graph_index) {
+  auto graph_type = static_cast<GraphType>(graph_index);
+  switch (graph_type) {
     case GraphType::ConvFwd:
     case GraphType::ConvBwdFilter:
     case GraphType::ConvBwdData: {

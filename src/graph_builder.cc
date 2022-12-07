@@ -534,7 +534,8 @@ void PrintGraphName(int graph_index) {
   printf(
       ">>>   graph_index (-graph_index <int>(+100 for matmul graphs)): %d\n",
       graph_index);
-  switch (graph_index) {
+  auto graph_type = static_cast<GraphType>(graph_index);
+  switch (graph_type) {
     case GraphType::ConvFwd:
       printf(">>>   graph_name: ConvFwdGraph\n");
       break;
@@ -572,7 +573,8 @@ void PrintGraphName(int graph_index) {
 
 std::optional<ConvGraphBuilderFnPtr> GetConvGraphBuilderByIndex(
     int graph_index) {
-  switch (graph_index) {
+  auto graph_type = static_cast<GraphType>(graph_index);
+  switch (graph_type) {
     case GraphType::ConvFwd:
       return GetConvFwdGraph;
     case GraphType::ConvBwdFilter:
@@ -595,7 +597,8 @@ std::optional<ConvGraphBuilderFnPtr> GetConvGraphBuilderByIndex(
 
 std::optional<MatMulGraphBuilderFnPtr> GetMatMulGraphBuilderByIndex(
     int graph_index) {
-  switch (graph_index) {
+  auto graph_type = static_cast<GraphType>(graph_index);
+  switch (graph_type) {
     case GraphType::MatMulBiasTanh:
       return GetMatMulBiasTanhGraph;
     case GraphType::MatMulBiasSigmoid:

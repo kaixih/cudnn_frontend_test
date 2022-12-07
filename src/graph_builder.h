@@ -8,7 +8,7 @@
 
 #include "util.h"
 
-enum GraphType {
+enum class GraphType {
   ConvFwd = 0,
   ConvBwdFilter = 1,
   ConvBwdData = 2,
