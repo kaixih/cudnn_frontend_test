@@ -27,6 +27,27 @@ $ make run_conv_graphs.out
 $ make run_matmul_graphs.out
 ```
 Note, the repo requires the cuDNN 8.5+ and is tested with cuDNN frontend v0.7.
+
+## Supported Graphs:
+You can find the most updated list of supported graphs in the
+[graph_builder.h](src/graph_builder.h). Currently the following graph patterns
+are supported:
+```cpp
+enum class GraphType {
+  ConvFwd = 0,
+  ConvBwdFilter = 1,
+  ConvBwdData = 2,
+  ConvAddBiasRelu = 3,
+  ConvBiasElu = 4,
+  ConvBiasRelu6 = 5,
+  ConvBiasLeakyRelu = 6,
+
+  MatMulBiasTanh = 100,
+  MatMulBiasSigmoid = 101,
+  MatMulBiasGeluExact = 102
+};
+```
+
 ## Run Convolution Graphs
 The example below displays the `Conv-Bias-Elu` graph is executed with specified
 convolution shapes, the fp16 inputs/outputs, and the channels_last data format.
