@@ -148,12 +148,14 @@ float InitOnes(int i);
 float InitZeros(int i);
 float InitRandoms(int i);
 float InitSeq(int i);
+float InitConstant(int i);
 
 template <typename T>
 void AllocTensorWithInitValues(void** d_ptr, size_t n,
                                std::function<float(int)> init_fn) {
   checkCUDA(cudaMalloc(d_ptr, n * sizeof(T)));
   T* h_ptr = new T[n];
+  srand(12);
   for (size_t i = 0; i < n; i++) {
     h_ptr[i] = static_cast<T>(init_fn(i));
   }
@@ -185,4 +187,6 @@ template void PrintTensor<float>(void* d_ptr, size_t n,
 template void PrintTensor<__half>(void* d_ptr, size_t n,
                                   const std::string& prompt);
 
+std::vector<int64_t> ComputeStrides(std::vector<int64_t>& vec,
+                                    int data_format);
 #endif  // CUDNN_FE_TEST_SRC_UTIL_H_

@@ -47,6 +47,26 @@ std::vector<int64_t> ComputeOutputDims(std::vector<int64_t>& a_vec,
 }
 
 std::vector<int64_t> ComputeStrides(std::vector<int64_t>& vec,
+                                    int64_t transpose = 0) {
+  int tensor_dims = vec.size();
+  std::vector<int64_t> strides(tensor_dims);
+
+  if (transpose == 0) {
+    strides[tensor_dims - 1] = 1;
+    for (int64_t d = tensor_dims - 2; d >= 0; d--) {
+      strides[d] = strides[d + 1] * vec[d + 1];
+    }
+  } else {
+    strides[1] = 1;
+    // For transposed access, vec[1] becomes the leading dim.
+    strides[tensor_dims - 1] = strides[1] * vec[1];
+    strides[0] = strides[2] * vec[2];
+  }
+  return strides;
+}
+}  // namespace
+
+std::vector<int64_t> ComputeStrides(std::vector<int64_t>& vec,
                                     int data_format) {
   int tensor_dims = vec.size();
   std::vector<int64_t> strides(tensor_dims);
@@ -67,26 +87,6 @@ std::vector<int64_t> ComputeStrides(std::vector<int64_t>& vec,
   }
   return strides;
 }
-
-std::vector<int64_t> ComputeStrides(std::vector<int64_t>& vec,
-                                    int64_t transpose = 0) {
-  int tensor_dims = vec.size();
-  std::vector<int64_t> strides(tensor_dims);
-
-  if (transpose == 0) {
-    strides[tensor_dims - 1] = 1;
-    for (int64_t d = tensor_dims - 2; d >= 0; d--) {
-      strides[d] = strides[d + 1] * vec[d + 1];
-    }
-  } else {
-    strides[1] = 1;
-    // For transposed access, vec[1] becomes the leading dim.
-    strides[tensor_dims - 1] = strides[1] * vec[1];
-    strides[0] = strides[2] * vec[2];
-  }
-  return strides;
-}
-}  // namespace
 
 bool IsPrintAll() {
   static bool result = [] {
@@ -370,3 +370,4 @@ float InitOnes(int i) { return 1.f; }
 float InitZeros(int i) { return 0.f; }
 float InitRandoms(int i) { return static_cast<float>(rand()) / RAND_MAX; }
 float InitSeq(int i) { return static_cast<float>(i); }
+float InitConstant(int i) { return 0.001f; }

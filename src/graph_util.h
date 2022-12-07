@@ -18,6 +18,7 @@ struct Edge {
 
 struct Node {
   std::string op_name;
+  std::string node_name;
   cudnnDataType_t op_dtype;
   cudnn_frontend::BackendDescriptor* desc;
   std::vector<double> scales;
@@ -29,6 +30,6 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
 
 std::optional<cudnn_frontend::Tensor> CreateCudnnTensor(
     const int64_t* dims, const int64_t* strides, int n, int64_t uid, int dtype,
-    bool is_virtual = false);
+    bool is_virtual = false, bool by_value = false);
 
 #endif  // CUDNN_FE_TEST_SRC_GRAPH_UTIL_H_

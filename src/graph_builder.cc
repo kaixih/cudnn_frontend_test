@@ -36,8 +36,8 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> GetConvFwdGraph(
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"convolution", accumulator_type, &conv_desc, {1., 0.},
-         /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", &tensor_y}}}};
+      {"convolution", "convolution", accumulator_type, &conv_desc, {1., 0.},
+       /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", &tensor_y}}}};
   // clang-format on
   return CreateOpGraph(cudnn, nodes);
 }
@@ -76,8 +76,9 @@ GetConvBwdFilterGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"convolution_bwd_filter", accumulator_type, &conv_desc, {1., 0.},
-         /*ports=*/{{"x", &tensor_x}, {"dw", &tensor_w}, {"dy", &tensor_y}}}};
+      {"convolution_bwd_filter", "convolution_bwd_filter", accumulator_type,
+       &conv_desc, {1., 0.},
+       /*ports=*/{{"x", &tensor_x}, {"dw", &tensor_w}, {"dy", &tensor_y}}}};
   // clang-format on
   return CreateOpGraph(cudnn, nodes);
 }
@@ -116,8 +117,9 @@ GetConvBwdDataGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"convolution_bwd_input", accumulator_type, &conv_desc, {1., 0.},
-         /*ports=*/{{"dx", &tensor_x}, {"w", &tensor_w}, {"dy", &tensor_y}}}};
+      {"convolution_bwd_input", "convolution_bwd_input", accumulator_type,
+       &conv_desc, {1., 0.},
+       /*ports=*/{{"dx", &tensor_x}, {"w", &tensor_w}, {"dy", &tensor_y}}}};
   // clang-format on
   return CreateOpGraph(cudnn, nodes);
 }
@@ -176,14 +178,14 @@ GetConvAddBiasReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"convolution", accumulator_type, &conv_desc, {1., 0.},
-         /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"add", accumulator_type, nullptr, {1., 0.},
-         /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_z}, {"y", ""}}},
-      {"bias_add", accumulator_type, nullptr, {},
-         /*ports=*/{{"x", "add:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"relu", activation_type, nullptr, {},
-         /*ports=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
+      {"convolution", "convolution", accumulator_type, &conv_desc, {1., 0.},
+       /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+      {"add", "add", accumulator_type, nullptr, {1., 0.},
+       /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_z}, {"y", ""}}},
+      {"bias_add", "bias_add", accumulator_type, nullptr, {},
+       /*ports=*/{{"x", "add:y"}, {"b", &tensor_b}, {"y", ""}}},
+      {"relu", "relu", activation_type, nullptr, {},
+       /*ports=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
   // clang-format on
 
   return CreateOpGraph(cudnn, nodes);
@@ -244,12 +246,12 @@ GetConvBiasEluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"convolution", accumulator_type, &conv_desc, {1., 0.},
-         /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"bias_add", accumulator_type, nullptr, {},
-         /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"elu", activation_type, &elu_desc, {},
-         /*ports=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
+      {"convolution", "convolution", accumulator_type, &conv_desc, {1., 0.},
+       /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+      {"bias_add", "bias_add", accumulator_type, nullptr, {},
+       /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
+      {"elu", "elu", activation_type, &elu_desc, {},
+       /*ports=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
   // clang-format on
 
   return CreateOpGraph(cudnn, nodes);
@@ -303,12 +305,12 @@ GetConvBiasRelu6Graph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"convolution", accumulator_type, &conv_desc, {1., 0.},
-         /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"bias_add", accumulator_type, nullptr, {},
-         /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"relu6", activation_type, nullptr, {},
-         /*ports=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
+      {"convolution", "convolution", accumulator_type, &conv_desc, {1., 0.},
+       /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+      {"bias_add", "bias_add", accumulator_type, nullptr, {},
+       /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
+      {"relu6", "relu6", activation_type, nullptr, {},
+       /*ports=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
   // clang-format on
 
   return CreateOpGraph(cudnn, nodes);
@@ -369,12 +371,126 @@ GetConvBiasLeakyReluGraph(ConvOpts& opts, cudnnHandle_t& cudnn) {
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"convolution", accumulator_type, &conv_desc, {1., 0.},
-         /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
-      {"bias_add", accumulator_type, nullptr, {},
-         /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
-      {"leakyrelu", activation_type, &leakyrelu_desc, {},
-         /*ports=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
+      {"convolution", "convolution", accumulator_type, &conv_desc, {1., 0.},
+       /*ports=*/{{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+      {"bias_add", "bias_add", accumulator_type, nullptr, {},
+       /*ports=*/{{"x", "convolution:y"}, {"b", &tensor_b}, {"y", ""}}},
+      {"leakyrelu", "leakyrelu", activation_type, &leakyrelu_desc, {},
+       /*ports=*/{{"x", "bias_add:y"}, {"y", &tensor_y}}}};
+  // clang-format on
+
+  return CreateOpGraph(cudnn, nodes);
+}
+
+std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
+GetConvBn(ConvOpts& opts, cudnnHandle_t& cudnn) {
+  // CUDNN fused operation supports the pattern in the form of Conv + BatchNorm.
+  // Therefore, we need to build a graph of the five ops with their input/output
+  // tensor edges:
+  // Conv  : input: tensor_x, tensor_w;          output: tensor_conv (virtual)
+  // Sub   : input: tensor_conv, tensor_mean;    output: tensor_sub (virtual)
+  // Add   : input: tensor_variance, tensor_eps; output: tensor_add (virtual)
+  // Rsqrt : input: tensor_add;                  output: tensor_rsqrt (virtual)
+  // Mul   : input: tensor_sub, tensor_rsqrt;    output: tensor_mul0 (virtual)
+  // Mul   : input: tensor_mul0, tensor_gamma;   output: tensor_mul1 (virtual)
+  // Add   : input: tensor_mul1, tensor_beta;    output: tensor_y
+
+  ASSIGN_OR_RETURN(auto tensor_x,
+                   CreateCudnnTensor(opts.input_dims, opts.input_strides,
+                                     opts.num_dims + 2, 'x', opts.data_type),
+                   "Failed to build tensor x");
+
+  ASSIGN_OR_RETURN(auto tensor_y,
+                   CreateCudnnTensor(opts.output_dims, opts.output_strides,
+                                     opts.num_dims + 2, 'y', opts.data_type),
+                   "Failed to build tensor y");
+
+  ASSIGN_OR_RETURN(auto tensor_w,
+                   CreateCudnnTensor(opts.filter_dims, opts.filter_strides,
+                                     opts.num_dims + 2, 'w', opts.data_type),
+                   "Failed to build tensor w");
+
+  std::vector<int64_t> mean_dims(opts.num_dims + 2, 1);
+  mean_dims[1] = opts.filter_dims[0];
+  std::vector<int64_t> mean_strides = ComputeStrides(mean_dims,
+                                                     opts.data_format);
+  
+  ASSIGN_OR_RETURN(auto tensor_mean,
+                   CreateCudnnTensor(mean_dims.data(), mean_strides.data(),
+                                     opts.num_dims + 2, 'm', opts.data_type),
+                   "Failed to build tensor mean");
+  ASSIGN_OR_RETURN(auto tensor_variance,
+                   CreateCudnnTensor(mean_dims.data(), mean_strides.data(),
+                                     opts.num_dims + 2, 'v', opts.data_type),
+                   "Failed to build tensor variance");
+  ASSIGN_OR_RETURN(auto tensor_gamma,
+                   CreateCudnnTensor(mean_dims.data(), mean_strides.data(),
+                                     opts.num_dims + 2, 'g', opts.data_type),
+                   "Failed to build tensor gamma");
+  ASSIGN_OR_RETURN(auto tensor_beta,
+                   CreateCudnnTensor(mean_dims.data(), mean_strides.data(),
+                                     opts.num_dims + 2, 'b', opts.data_type),
+                   "Failed to build tensor beta");
+
+  // Need to manually create these two virtual tensors, since the current
+  // implementation cannot correctly infer the output shapes of these two ops.
+  ASSIGN_OR_RETURN(auto tensor_variance_out,
+                   CreateCudnnTensor(mean_dims.data(), mean_strides.data(),
+                                     opts.num_dims + 2, 'k', opts.data_type,
+                                     true),
+                   "Failed to build tensor variance out (virtual)");
+  ASSIGN_OR_RETURN(auto tensor_rsqrt_out,
+                   CreateCudnnTensor(mean_dims.data(), mean_strides.data(),
+                                     opts.num_dims + 2, 't', opts.data_type,
+                                     true),
+                   "Failed to build tensor rsqrt out (virtual)");
+
+  std::vector<int64_t> eps_dims(opts.num_dims + 2, 1);
+  std::vector<int64_t> eps_strides(opts.num_dims + 2, 1);
+
+  // We create a tensor and set the by_value so that we can directly pass the
+  // host pointer.
+  ASSIGN_OR_RETURN(auto tensor_epsilon,
+                   CreateCudnnTensor(eps_dims.data(), eps_strides.data(),
+                                     opts.num_dims + 2, 'e', /*dtype=*/0,
+                                     /*is_virtual=*/false, /*by_value=*/true),
+                   "Failed to build tensor epsilon");
+
+  auto accumulator_type = GetConvAccumulatorCudnnDataType(opts.data_type);
+  auto activation_type = GetConvActivationCudnnDataType(opts.data_type);
+
+  auto conv_mode = CUDNN_CROSS_CORRELATION;
+  int conv_dim = opts.num_dims;
+
+  auto conv_desc = cudnn_frontend::ConvDescBuilder()
+                       .setComputeType(accumulator_type)
+                       .setMathMode(conv_mode)
+                       .setSpatialDimCount(conv_dim)
+                       .setSpatialStride(conv_dim, opts.strides)
+                       .setPrePadding(conv_dim, opts.paddings)
+                       .setPostPadding(conv_dim, opts.paddings)
+                       .setDilation(conv_dim, opts.dilations)
+                       .build();
+  RETURN_MSG_IF_CUDNN_ERROR(conv_desc);
+
+  // clang-format off
+  std::vector<Node> nodes = {
+      {"convolution", "convolution", accumulator_type, &conv_desc, {1., 0.},
+       {{"x", &tensor_x}, {"w", &tensor_w}, {"y", ""}}},
+      {"sub", "sub", activation_type, nullptr, {},
+       {{"x", "convolution:y"}, {"b", &tensor_mean}, {"y", ""}}},
+      {"add", "add0", activation_type, nullptr, {},
+       {{"x", &tensor_variance}, {"b", &tensor_epsilon},
+        {"y", &tensor_variance_out}}},
+      {"rsqrt", "rsqrt", activation_type, nullptr, {},
+       {{"x", "add0:y"}, {"y", &tensor_rsqrt_out}}},
+      {"mul", "mul0", activation_type, nullptr, {},
+       {{"x", "sub:y"}, {"b", "rsqrt:y"}, {"y", ""}}},
+      {"mul", "mul1", activation_type, nullptr, {},
+       {{"x", "mul0:y"}, {"b", &tensor_gamma}, {"y", ""}}},
+      {"add", "add1", activation_type, nullptr, {},
+       {{"x", "mul1:y"}, {"b", &tensor_beta}, {"y", &tensor_y}}}
+  };
   // clang-format on
 
   return CreateOpGraph(cudnn, nodes);
@@ -419,11 +535,11 @@ GetMatMulBiasTanhGraph(MatMulOpts& opts, cudnnHandle_t& cudnn) {
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"matmul", accumulator_type, &matmul_desc, {},
+      {"matmul", "matmul", accumulator_type, &matmul_desc, {},
          {{"a", &tensor_a}, {"b", &tensor_b}, {"c", ""}}},
-      {"bias_add", accumulator_type, nullptr, {},
+      {"bias_add", "bias_add", accumulator_type, nullptr, {},
          {{"x", "matmul:c"}, {"b", &tensor_z}, {"y", ""}}},
-      {"tanh", activation_type, nullptr, {},
+      {"tanh", "tanh", activation_type, nullptr, {},
          {{"x", "bias_add:y"}, {"y", &tensor_c}}}};
   // clang-format on
 
@@ -469,11 +585,11 @@ GetMatMulBiasSigmoidGraph(MatMulOpts& opts, cudnnHandle_t& cudnn) {
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"matmul", accumulator_type, &matmul_desc, {},
+      {"matmul", "matmul", accumulator_type, &matmul_desc, {},
          {{"a", &tensor_a}, {"b", &tensor_b}, {"c", ""}}},
-      {"bias_add", accumulator_type, nullptr, {},
+      {"bias_add", "bias_add", accumulator_type, nullptr, {},
          {{"x", "matmul:c"}, {"b", &tensor_z}, {"y", ""}}},
-      {"sigmoid", activation_type, nullptr, {},
+      {"sigmoid", "sigmoid", activation_type, nullptr, {},
          {{"x", "bias_add:y"}, {"y", &tensor_c}}}};
   // clang-format on
 
@@ -519,11 +635,11 @@ GetMatMulBiasGeluExactGraph(MatMulOpts& opts, cudnnHandle_t& cudnn) {
 
   // clang-format off
   std::vector<Node> nodes = {
-      {"matmul", accumulator_type, &matmul_desc, {},
+      {"matmul", "matmul", accumulator_type, &matmul_desc, {},
          {{"a", &tensor_a}, {"b", &tensor_b}, {"c", ""}}},
-      {"bias_add", accumulator_type, nullptr, {},
+      {"bias_add", "bias_add", accumulator_type, nullptr, {},
          {{"x", "matmul:c"}, {"b", &tensor_z}, {"y", ""}}},
-      {"gelu_exact", activation_type, nullptr, {},
+      {"gelu_exact", "gelu_exact", activation_type, nullptr, {},
          {{"x", "bias_add:y"}, {"y", &tensor_c}}}};
   // clang-format on
 
@@ -557,6 +673,9 @@ void PrintGraphName(int graph_index) {
     case GraphType::ConvBiasLeakyRelu:
       printf(">>>   graph_name: ConvBiasLeakyReluGraph\n");
       break;
+    case GraphType::ConvBn:
+      printf(">>>   graph_name: ConvBn\n");
+      break;
     case GraphType::MatMulBiasTanh:
       printf(">>>   graph_name: MatMulBiasTanhGraph\n");
       break;
@@ -589,6 +708,8 @@ std::optional<ConvGraphBuilderFnPtr> GetConvGraphBuilderByIndex(
       return GetConvBiasRelu6Graph;
     case GraphType::ConvBiasLeakyRelu:
       return GetConvBiasLeakyReluGraph;
+    case GraphType::ConvBn:
+      return GetConvBn;
     default:
       printf(RED "!!! Unsupported conv graph index: %d\n" RESET, graph_index);
       return {};

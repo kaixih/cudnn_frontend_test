@@ -20,17 +20,17 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetConvolutionOp(
   op_builder.setcDesc(*conv_desc);
 
   for (const auto& tensor : tensors) {
-    if (tensor.first == node.op_name + ":x") {
+    if (tensor.first == node.node_name + ":x") {
       op_builder.setxDesc(*tensor.second);
-    } else if (tensor.first == node.op_name + ":w") {
+    } else if (tensor.first == node.node_name + ":w") {
       op_builder.setwDesc(*tensor.second);
-    } else if (tensor.first == node.op_name + ":y") {
+    } else if (tensor.first == node.node_name + ":y") {
       op_builder.setyDesc(*tensor.second);
-    } else if (tensor.first == node.op_name + ":dy") {
+    } else if (tensor.first == node.node_name + ":dy") {
       op_builder.setdyDesc(*tensor.second);
-    } else if (tensor.first == node.op_name + ":dx") {
+    } else if (tensor.first == node.node_name + ":dx") {
       op_builder.setdxDesc(*tensor.second);
-    } else if (tensor.first == node.op_name + ":dw") {
+    } else if (tensor.first == node.node_name + ":dw") {
       op_builder.setdwDesc(*tensor.second);
     }
   }
@@ -61,11 +61,11 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetMatMulOp(
   op_builder.setmatmulDesc(*matmul_desc);
 
   for (const auto& tensor : tensors) {
-    if (tensor.first == node.op_name + ":a") {
+    if (tensor.first == node.node_name + ":a") {
       op_builder.setaMatDesc(*tensor.second);
-    } else if (tensor.first == node.op_name + ":b") {
+    } else if (tensor.first == node.node_name + ":b") {
       op_builder.setbMatDesc(*tensor.second);
-    } else if (tensor.first == node.op_name + ":c") {
+    } else if (tensor.first == node.node_name + ":c") {
       op_builder.setcMatDesc(*tensor.second);
     }
   }
@@ -92,6 +92,10 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
       pw_desc_builder.setMode(CUDNN_POINTWISE_RELU_FWD);
     } else if (node.op_name == "bias_add" || node.op_name == "add") {
       pw_desc_builder.setMode(CUDNN_POINTWISE_ADD);
+    } else if (node.op_name == "sub") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_SUB);
+    } else if (node.op_name == "rsqrt") {
+      pw_desc_builder.setMode(CUDNN_POINTWISE_RSQRT);
     } else if (node.op_name == "elu") {
       pw_desc_builder.setMode(CUDNN_POINTWISE_ELU_FWD);
     } else if (node.op_name == "relu6") {
@@ -127,13 +131,13 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
   }
 
   for (const auto& tensor : tensors) {
-    if (tensor.first == node.op_name + ":x") {
+    if (tensor.first == node.node_name + ":x") {
       op_builder.setxDesc(*tensor.second);
-    } else if (tensor.first == node.op_name + ":b") {
+    } else if (tensor.first == node.node_name + ":b") {
       op_builder.setbDesc(*tensor.second);
-    } else if (tensor.first == node.op_name + ":y") {
+    } else if (tensor.first == node.node_name + ":y") {
       op_builder.setyDesc(*tensor.second);
-    } else if (tensor.first == node.op_name + ":t") {
+    } else if (tensor.first == node.node_name + ":t") {
       op_builder.settDesc(*tensor.second);
     }
   }
@@ -154,7 +158,8 @@ std::optional<cudnn_frontend::Tensor> CreateCudnnTensor(const int64_t* dims,
                                                         const int64_t* strides,
                                                         int n, int64_t uid,
                                                         int dtype,
-                                                        bool is_virtual) {
+                                                        bool is_virtual,
+                                                        bool by_value) {
   auto tensor = cudnn_frontend::TensorBuilder()
                     .setDim(n, dims)
                     .setStride(n, strides)
@@ -162,6 +167,7 @@ std::optional<cudnn_frontend::Tensor> CreateCudnnTensor(const int64_t* dims,
                     .setAlignment(32)
                     .setDataType(ToCudnnDataType(dtype))
                     .setVirtual(is_virtual)
+                    .setByValue(by_value)
                     .build();
   RETURN_MSG_IF_CUDNN_ERROR(tensor);
   return tensor;
@@ -196,14 +202,14 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
   // the tensors.
   std::unordered_map<std::string, cudnn_frontend::Tensor> virtual_tensors;
   // All tensors are marked in "tensors" in the form of:
-  //   "op_name:port" -> tensor address
+  //   "node_name:port" -> tensor address
   std::unordered_map<std::string, cudnn_frontend::Tensor*> tensors;
   int64_t reserved_uid = 1024;
   // Put virtual (connecting) tensors and given (end) tensors to "tensors". In
   // this step the virtual tensors can only be marked in the fanout sides.
   for (int i = 0; i < nodes.size(); i++) {
     for (const auto& edge : nodes[i].edges) {
-      std::string tag = nodes[i].op_name + ":" + edge.first;
+      std::string tag = nodes[i].node_name + ":" + edge.first;
       auto tensor_name_or = edge.second.tensor_name;
       auto tensor_ptr_or = edge.second.tensor_ptr;
       if (tensor_name_or.has_value() && tensor_name_or.value() == "") {
@@ -213,7 +219,7 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
             CreateCudnnTensor(output_dims, output_strides, ndims,
                               reserved_uid++, nodes[i].op_dtype,
                               /*is_virtual=*/true),
-            "Failed to build the virtual tensor for " + nodes[i].op_name);
+            "Failed to build the virtual tensor for " + nodes[i].node_name);
 
         virtual_tensors.insert({tag, std::move(tensor_output)});
         tensors[tag] = &virtual_tensors.at(tag);
@@ -234,7 +240,7 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
                  tensor_name_or.value().c_str());
           return {};
         }
-        tensors[nodes[i].op_name + ":" + edge.first] = found->second;
+        tensors[nodes[i].node_name + ":" + edge.first] = found->second;
       }
     }
   }
@@ -253,15 +259,15 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
             CUDNN_BACKEND_OPERATION_CONVOLUTION_BACKWARD_DATA_DESCRIPTOR;
       }
       ASSIGN_OR_RETURN(auto op, GetConvolutionOp(nodes[i], conv_kind, tensors),
-                       "Failed to build op " + nodes[i].op_name);
+                       "Failed to build op " + nodes[i].node_name);
       built_ops.emplace_back(std::move(*op));
     } else if (nodes[i].op_name == "matmul") {
       ASSIGN_OR_RETURN(auto op, GetMatMulOp(nodes[i], tensors),
-                       "Failed to build op " + nodes[i].op_name);
+                       "Failed to build op " + nodes[i].node_name);
       built_ops.emplace_back(std::move(*op));
     } else {
       ASSIGN_OR_RETURN(auto op, GetPointwiseOp(nodes[i], tensors),
-                       "Failed to build op " + nodes[i].op_name);
+                       "Failed to build op " + nodes[i].node_name);
       built_ops.emplace_back(std::move(*op));
     }
   }
