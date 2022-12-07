@@ -18,6 +18,7 @@ struct Edge {
 
 struct Node {
   std::string op_name;
+  std::string node_name;
   cudnnDataType_t op_dtype;
   cudnn_frontend::BackendDescriptor* desc;
   std::vector<double> scales;

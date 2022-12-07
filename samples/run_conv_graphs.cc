@@ -51,11 +51,21 @@ int main(int argc, char** argv) {
   void* f_ptr;
   void* b_ptr;
   void* y_ptr;
+  void* mean_ptr;
+  void* var_ptr;
+  void* gamma_ptr;
+  void* beta_ptr;
+  void* eps_ptr;
 
   init_fn(&x_ptr, opts.input_size(), InitRandoms);
   init_fn(&f_ptr, opts.filter_size(), InitRandoms);
   init_fn(&b_ptr, opts.bias_size(), InitRandoms);
   init_fn(&y_ptr, opts.output_size(), InitRandoms);
+  init_fn(&mean_ptr, opts.filter_dims[0], InitRandoms);
+  init_fn(&var_ptr, opts.filter_dims[0], InitRandoms);
+  init_fn(&gamma_ptr, opts.filter_dims[0], InitRandoms);
+  init_fn(&beta_ptr, opts.filter_dims[0], InitRandoms);
+  init_fn(&eps_ptr, 1, InitRandoms);
   checkCUDA(cudaDeviceSynchronize());
 
   bool print_on = IsPrintAll();
@@ -63,6 +73,11 @@ int main(int argc, char** argv) {
     print_fn(x_ptr, opts.input_size(), "### input:");
     print_fn(f_ptr, opts.filter_size(), "### filter:");
     print_fn(b_ptr, opts.bias_size(), "### bias:");
+    print_fn(mean_ptr, opts.filter_dims[0], "### mean:");
+    print_fn(var_ptr, opts.filter_dims[0], "### var:");
+    print_fn(gamma_ptr, opts.filter_dims[0], "### gamma:");
+    print_fn(beta_ptr, opts.filter_dims[0], "### beta:");
+    print_fn(eps_ptr, 1, "### eps:");
   }
 
   auto graph_type = static_cast<GraphType>(graph_index);
@@ -89,6 +104,14 @@ int main(int argc, char** argv) {
       auto launcher = LaunchOpRunner<void*, void*, void*, void*>();
       launcher(cudnn, plan_desc, workspace_ptr, uids, x_ptr, f_ptr, b_ptr,
                y_ptr);
+      break;
+    }
+    case GraphType::ConvBn: {
+      int64_t uids[] = {'x', 'w', 'y', 'm', 'v', 'g', 'b', 'e'};
+      auto launcher = LaunchOpRunner<void*, void*, void*, void*, void*, void*,
+                                     void*, void*>();
+      launcher(cudnn, plan_desc, workspace_ptr, uids, x_ptr, f_ptr, y_ptr,
+               mean_ptr, var_ptr, gamma_ptr, beta_ptr, eps_ptr);
       break;
     }
     default: {
