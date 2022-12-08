@@ -77,19 +77,19 @@ struct ConvOpts {
   int64_t engine_index;
 
   int64_t input_size() {
-    return std::accumulate(input_dims, input_dims + num_dims + 2, 1,
+    return std::accumulate(input_dims, input_dims + num_dims + 2, 1lu,
                            std::multiplies<int64_t>());
   }
   int64_t output_size() {
-    return std::accumulate(output_dims, output_dims + num_dims + 2, 1,
+    return std::accumulate(output_dims, output_dims + num_dims + 2, 1lu,
                            std::multiplies<int64_t>());
   }
   int64_t filter_size() {
-    return std::accumulate(filter_dims, filter_dims + num_dims + 2, 1,
+    return std::accumulate(filter_dims, filter_dims + num_dims + 2, 1lu,
                            std::multiplies<int64_t>());
   }
   int64_t bias_size() {
-    return std::accumulate(bias_dims, bias_dims + num_dims + 2, 1,
+    return std::accumulate(bias_dims, bias_dims + num_dims + 2, 1lu,
                            std::multiplies<int64_t>());
   }
 };
