@@ -50,9 +50,13 @@ int main(int argc, char** argv) {
 
   void* x_ptr;
   void* y_ptr;
+  void* dx_ptr;
+  void* dy_ptr;
 
   init_fn(&x_ptr, opts.input_size(), InitRandoms);
   init_fn(&y_ptr, opts.output_size(), InitRandoms);
+  init_fn(&dx_ptr, opts.input_size(), InitRandoms);
+  init_fn(&dy_ptr, opts.output_size(), InitRandoms);
   checkCUDA(cudaDeviceSynchronize());
 
   bool print_on = IsPrintAll();
@@ -68,7 +72,12 @@ int main(int argc, char** argv) {
       launcher(cudnn, plan_desc, workspace_ptr, uids, x_ptr, y_ptr);
       break;
     }
-    case GraphType::AvgPoolBwd:
+    case GraphType::AvgPoolBwd: {
+      int64_t uids[] = {'x', 'y'};
+      auto launcher = LaunchOpRunner<void*, void*>();
+      launcher(cudnn, plan_desc, workspace_ptr, uids, dx_ptr, dy_ptr);
+      break;
+    }
     case GraphType::MaxPoolFwd:
     case GraphType::MaxPoolBwd:
     default: {
