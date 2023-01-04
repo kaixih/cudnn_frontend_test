@@ -443,7 +443,10 @@ std::string CudnnStatusToString(cudnnStatus_t status) {
 cudnnDataType_t ToCudnnDataType(int data_type) {
   if (data_type == 0) {
     return CUDNN_DATA_FLOAT;
+  } else if (data_type == 2) {
+    return CUDNN_DATA_INT8;
   }
+
   return CUDNN_DATA_HALF;
 }
 

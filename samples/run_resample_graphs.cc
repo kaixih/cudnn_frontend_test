@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
 
   void* x_ptr;
   void* y_ptr;
+  void* idx_ptr;
   void* dx_ptr;
   void* dy_ptr;
 
@@ -57,14 +58,20 @@ int main(int argc, char** argv) {
   init_fn(&y_ptr, opts.output_size(), InitRandoms);
   init_fn(&dx_ptr, opts.input_size(), InitRandoms);
   init_fn(&dy_ptr, opts.output_size(), InitRandoms);
+  // Index tensor uses int8 dtype.
+  AllocTensorWithInitValues<char>(&idx_ptr, opts.output_size(), InitOnes);
   checkCUDA(cudaDeviceSynchronize());
+
+  auto graph_type = static_cast<GraphType>(graph_index);
 
   bool print_on = IsPrintAll();
   if (print_on) {
     print_fn(x_ptr, opts.input_size(), "### input:");
+    if (graph_type == GraphType::MaxPoolBwd) {
+      PrintTensor<char>(idx_ptr, opts.output_size(), "### index:");
+    }
   }
 
-  auto graph_type = static_cast<GraphType>(graph_index);
   switch (graph_type) {
     case GraphType::AvgPoolFwd: {
       int64_t uids[] = {'x', 'y'};
@@ -78,7 +85,12 @@ int main(int argc, char** argv) {
       launcher(cudnn, plan_desc, workspace_ptr, uids, dx_ptr, dy_ptr);
       break;
     }
-    case GraphType::MaxPoolFwd:
+    case GraphType::MaxPoolFwd: {
+      int64_t uids[] = {'x', 'y', 'i'};
+      auto launcher = LaunchOpRunner<void*, void*, void*>();
+      launcher(cudnn, plan_desc, workspace_ptr, uids, x_ptr, y_ptr, idx_ptr);
+      break;
+    }
     case GraphType::MaxPoolBwd:
     default: {
       printf(RED "!!! Unsupported graph index: %d\n" RESET, graph_index);
@@ -89,6 +101,9 @@ int main(int argc, char** argv) {
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {
     print_fn(y_ptr, opts.output_size(), "### output:");
+    if (graph_type == GraphType::MaxPoolFwd) {
+      PrintTensor<char>(idx_ptr, opts.output_size(), "### index:");
+    }
   }
   printf(GREEN ">>> Convolution Finished.\n" RESET);
 }

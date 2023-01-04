@@ -98,6 +98,8 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetResampleOp(
       op_builder.setdxDesc(*tensor.second);
     } else if (tensor.first == node.node_name + ":dy") {
       op_builder.setdyDesc(*tensor.second);
+    } else if (tensor.first == node.node_name + ":idx") {
+      op_builder.setidxDesc(*tensor.second);
     }
   }
 
