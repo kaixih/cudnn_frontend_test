@@ -46,6 +46,11 @@ enum class GraphType {
   MatMulBiasTanh = 100,
   MatMulBiasSigmoid = 101,
   MatMulBiasGeluExact = 102
+
+  AvgPoolFwd = 200,
+  AvgPoolBwd = 201,
+  MaxPoolFwd = 202,
+  MaxPoolBwd = 203
 };
 ```
 

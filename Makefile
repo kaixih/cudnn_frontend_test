@@ -5,7 +5,7 @@ CXX = nvcc
 HEADERS = $(wildcard src/*.h)
 SOURCES = $(wildcard src/*.cc)
 
-EXEC = run_conv_graphs.out run_matmul_graphs.out
+EXEC = run_conv_graphs.out run_matmul_graphs.out run_resample_graphs.out
 OBJECTS = $(SOURCES:.cc=.o)
 
 all: ${EXEC}
@@ -17,6 +17,9 @@ run_conv_graphs.out: samples/run_conv_graphs.cc ${OBJECTS}
 	${CXX} ${CPPFLAGS} ${LDFLAGS} -o $@ $^
 
 run_matmul_graphs.out: samples/run_matmul_graphs.cc ${OBJECTS}
+	${CXX} ${CPPFLAGS} ${LDFLAGS} -o $@ $^
+
+run_resample_graphs.out: samples/run_resample_graphs.cc ${OBJECTS}
 	${CXX} ${CPPFLAGS} ${LDFLAGS} -o $@ $^
 
 clean:

@@ -2,6 +2,44 @@
 
 #include "graph_util.h"
 
+std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
+GetAvgPoolFwdGraph(ResampleOpts& opts, cudnnHandle_t& cudnn) {
+  ASSIGN_OR_RETURN(auto tensor_x,
+                   CreateCudnnTensor(opts.input_dims, opts.input_strides,
+                                     opts.num_dims + 2, 'x', opts.data_type),
+                   "Failed to build tensor x");
+
+  ASSIGN_OR_RETURN(auto tensor_y,
+                   CreateCudnnTensor(opts.output_dims, opts.output_strides,
+                                     opts.num_dims + 2, 'y', opts.data_type),
+                   "Failed to build tensor y");
+
+  auto resample_mode = CUDNN_RESAMPLE_AVGPOOL_EXCLUDE_PADDING;
+  int resample_dim = opts.num_dims;
+  auto compute_type = GetConvAccumulatorCudnnDataType(opts.data_type);
+  auto nan_opt = CUDNN_PROPAGATE_NAN;
+  auto padding_mode = CUDNN_ZERO_PAD;
+
+  auto pool_desc = cudnn_frontend::ResampleDescBuilder()
+                       .setComputeType(compute_type)
+                       .setNanPropagation(nan_opt)
+                       .setResampleMode(resample_mode)
+                       .setPaddingMode(padding_mode)
+                       .setSpatialDim(resample_dim, opts.window_sizes)
+                       .setSpatialStride(resample_dim, opts.strides)
+                       .setPrePadding(resample_dim, opts.paddings)
+                       .setPostPadding(resample_dim, opts.paddings)
+                       .build();
+  RETURN_MSG_IF_CUDNN_ERROR(pool_desc);
+
+  // clang-format off
+  std::vector<Node> nodes = {
+      {"resample_fwd", "resample_fwd", compute_type, &pool_desc, {1., 0.},
+       /*ports=*/{{"x", &tensor_x}, {"y", &tensor_y}}}};
+  // clang-format on
+  return CreateOpGraph(cudnn, nodes);
+}
+
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> GetConvFwdGraph(
     ConvOpts& opts, cudnnHandle_t& cudnn) {
   ASSIGN_OR_RETURN(auto tensor_x,
@@ -648,8 +686,8 @@ GetMatMulBiasGeluExactGraph(MatMulOpts& opts, cudnnHandle_t& cudnn) {
 
 void PrintGraphName(int graph_index) {
   printf(
-      ">>>   graph_index (-graph_index <int>(+100 for matmul graphs)): %d\n",
-      graph_index);
+      ">>>   graph_index (-graph_index <int>(+100 for matmul graphs, "
+      "+200 for resample graphs)): %d\n", graph_index);
   auto graph_type = static_cast<GraphType>(graph_index);
   switch (graph_type) {
     case GraphType::ConvFwd:
@@ -684,6 +722,18 @@ void PrintGraphName(int graph_index) {
       break;
     case GraphType::MatMulBiasGeluExact:
       printf(">>>   graph_name: MatMulBiasGeluExactGraph\n");
+      break;
+    case GraphType::AvgPoolFwd:
+      printf(">>>   graph_name: AvgPoolFwd\n");
+      break;
+    case GraphType::AvgPoolBwd:
+      printf(">>>   graph_name: AvgPoolBwd\n");
+      break;
+    case GraphType::MaxPoolFwd:
+      printf(">>>   graph_name: MaxPoolFwd\n");
+      break;
+    case GraphType::MaxPoolBwd:
+      printf(">>>   graph_name: MaxPoolBwd\n");
       break;
     default:
       printf(RED "!!! Unsupported graph index: %d\n" RESET, graph_index);
@@ -728,6 +778,21 @@ std::optional<MatMulGraphBuilderFnPtr> GetMatMulGraphBuilderByIndex(
       return GetMatMulBiasGeluExactGraph;
     default:
       printf(RED "!!! Unsupported matmul graph index: %d\n" RESET, graph_index);
+      return {};
+  }
+}
+
+std::optional<ResampleGraphBuilderFnPtr> GetResampleGraphBuilderByIndex(
+    int graph_index) {
+  auto graph_type = static_cast<GraphType>(graph_index);
+  switch (graph_type) {
+    case GraphType::AvgPoolFwd:
+      return GetAvgPoolFwdGraph;
+    case GraphType::AvgPoolBwd:
+    case GraphType::MaxPoolFwd:
+    case GraphType::MaxPoolBwd:
+    default:
+      printf(RED "!!! Unsupported conv graph index: %d\n" RESET, graph_index);
       return {};
   }
 }

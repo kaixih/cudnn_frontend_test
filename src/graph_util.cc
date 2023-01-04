@@ -76,6 +76,37 @@ std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetMatMulOp(
       new cudnn_frontend::Operation(std::move(op)));
 }
 
+std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetResampleOp(
+    Node& node, cudnnBackendDescriptorType_t resample_kind, 
+    std::unordered_map<std::string, cudnn_frontend::Tensor*>& tensors) {
+  auto op_builder = cudnn_frontend::OperationBuilder(resample_kind);
+
+  cudnn_frontend::ResampleDesc* resample_desc =
+      reinterpret_cast<cudnn_frontend::ResampleDesc*>(node.desc);
+  if (resample_desc == nullptr) {
+    printf(RED "!!! Graph error: resample desc has to be specified!\n" RESET);
+    return {};
+  }
+  op_builder.setResampleDesc(*resample_desc);
+
+  for (const auto& tensor : tensors) {
+    if (tensor.first == node.node_name + ":x") {
+      op_builder.setxDesc(*tensor.second);
+    } else if (tensor.first == node.node_name + ":y") {
+      op_builder.setyDesc(*tensor.second);
+    } else if (tensor.first == node.node_name + ":dx") {
+      op_builder.setdxDesc(*tensor.second);
+    } else if (tensor.first == node.node_name + ":dy") {
+      op_builder.setdyDesc(*tensor.second);
+    }
+  }
+
+  auto op = op_builder.build();
+  RETURN_MSG_IF_CUDNN_ERROR(op);
+  return std::unique_ptr<cudnn_frontend::Operation>(
+      new cudnn_frontend::Operation(std::move(op)));
+}
+
 std::optional<std::unique_ptr<cudnn_frontend::Operation>> GetPointwiseOp(
     Node& node,
     std::unordered_map<std::string, cudnn_frontend::Tensor*>& tensors) {
@@ -263,6 +294,16 @@ std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> CreateOpGraph(
       built_ops.emplace_back(std::move(*op));
     } else if (nodes[i].op_name == "matmul") {
       ASSIGN_OR_RETURN(auto op, GetMatMulOp(nodes[i], tensors),
+                       "Failed to build op " + nodes[i].node_name);
+      built_ops.emplace_back(std::move(*op));
+    } else if (nodes[i].op_name.find("resample") != std::string::npos) {
+      cudnnBackendDescriptorType_t resample_kind;
+      if (nodes[i].op_name == "resample_fwd") {
+        resample_kind = CUDNN_BACKEND_OPERATION_RESAMPLE_FWD_DESCRIPTOR;
+      } else if (nodes[i].op_name == "resample_bwd") {
+        resample_kind = CUDNN_BACKEND_OPERATION_RESAMPLE_BWD_DESCRIPTOR;
+      }
+      ASSIGN_OR_RETURN(auto op, GetResampleOp(nodes[i], resample_kind, tensors),
                        "Failed to build op " + nodes[i].node_name);
       built_ops.emplace_back(std::move(*op));
     } else {

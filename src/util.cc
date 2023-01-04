@@ -46,6 +46,21 @@ std::vector<int64_t> ComputeOutputDims(std::vector<int64_t>& a_vec,
   return c_vec;
 }
 
+std::vector<int64_t> ComputeOutputDims(std::vector<int64_t>& input_vec,
+                                       std::vector<int64_t>& stride_vec,
+                                       std::vector<int64_t>& padding_vec,
+                                       std::vector<int64_t>& window_vec) {
+  int tensor_rank = input_vec.size();
+  std::vector<int64_t> results(tensor_rank);
+  results[0] = input_vec[0];
+  results[1] = input_vec[1];
+  for (int i = 0; i < tensor_rank - 2; i++) {
+    results[i + 2] = (input_vec[i + 2] + 2 * padding_vec[i] - window_vec[i]) /
+                         stride_vec[i] + 1;
+  }
+  return results;
+}
+
 std::vector<int64_t> ComputeStrides(std::vector<int64_t>& vec,
                                     int64_t transpose = 0) {
   int tensor_dims = vec.size();
@@ -287,6 +302,82 @@ std::string CudnnBehaviorNoteToString(cudnnBackendBehaviorNote_t status) {
     default:
       return "<unknown cudnn behavior note>";
   }
+}
+
+ResampleOpts ParseResampleOpts(int argc, char** argv) {
+  struct CmdResampleOpts {
+    std::string input_dims = "3,8,10,10";
+    std::string paddings = "1,1";
+    std::string strides = "2,2";
+    std::string window_sizes = "3,3";
+    int data_format = 1;
+    int data_type = 1;
+    int graph_index = 200;
+    int engine_index = 0;
+  };
+
+  auto parser = CmdOpts<CmdResampleOpts>::Create(
+      {{"-input", &CmdResampleOpts::input_dims},
+       {"-padding", &CmdResampleOpts::paddings},
+       {"-stride", &CmdResampleOpts::strides},
+       {"-window", &CmdResampleOpts::window_sizes},
+       {"-data_format", &CmdResampleOpts::data_format},
+       {"-data_type", &CmdResampleOpts::data_type},
+       {"-graph_index", &CmdResampleOpts::graph_index},
+       {"-engine_index", &CmdResampleOpts::engine_index}});
+
+  auto parsed_opts = parser->parse(argc, argv);
+
+  ResampleOpts opts;
+  // Get the dims from the parsed string.
+  auto input_vec = GetIntegersFromString(parsed_opts.input_dims);
+  std::copy(input_vec.begin(), input_vec.end(), opts.input_dims);
+  auto stride_vec = GetIntegersFromString(parsed_opts.strides);
+  std::copy(stride_vec.begin(), stride_vec.end(), opts.strides);
+  auto padding_vec = GetIntegersFromString(parsed_opts.paddings);
+  std::copy(padding_vec.begin(), padding_vec.end(), opts.paddings);
+  auto window_vec = GetIntegersFromString(parsed_opts.window_sizes);
+  std::copy(window_vec.begin(), window_vec.end(), opts.window_sizes);
+  auto output_vec = ComputeOutputDims(input_vec, stride_vec, padding_vec,
+                                      window_vec);
+  std::copy(output_vec.begin(), output_vec.end(), opts.output_dims);
+
+  // Compute the strides from the dims and format.
+  auto i_stride_vec = ComputeStrides(input_vec, parsed_opts.data_format);
+  std::copy(i_stride_vec.begin(), i_stride_vec.end(), opts.input_strides);
+  auto o_stride_vec = ComputeStrides(output_vec, parsed_opts.data_format);
+  std::copy(o_stride_vec.begin(), o_stride_vec.end(), opts.output_strides);
+
+  opts.num_dims = input_vec.size() - 2;
+  opts.data_type = parsed_opts.data_type;
+  opts.data_format = parsed_opts.data_format;
+  opts.graph_index = parsed_opts.graph_index;
+  opts.engine_index = parsed_opts.engine_index;
+
+  return opts;
+}
+
+void PrintResampleOpts(ResampleOpts& opts) {
+  printf(">>> Retrieved RESAMPLE specs:\n");
+  auto print_ints = [](const int64_t* a, int n, const std::string& name) {
+    printf(">>>   %s: ", name.c_str());
+    for (int i = 0; i < n; i++) {
+      printf("%ld, ", a[i]);
+    }
+    printf("\n");
+  };
+  print_ints(&opts.num_dims, 1, "num_spatial_dims");
+  print_ints(opts.input_dims, opts.num_dims + 2, "input_dims (-input)");
+  print_ints(opts.output_dims, opts.num_dims + 2, "output_dims (-output)");
+  print_ints(opts.input_strides, opts.num_dims + 2, "input_strides");
+  print_ints(opts.output_strides, opts.num_dims + 2, "output_strides");
+  print_ints(opts.paddings, opts.num_dims, "paddings (-padding)");
+  print_ints(opts.strides, opts.num_dims, "strides (-stride)");
+  print_ints(opts.window_sizes, opts.num_dims, "window_sizes (-window)");
+  print_ints(&opts.data_type, 1, "data_type (-data_type [0<fp32>|1<fp16>])");
+  print_ints(&opts.data_format, 1,
+             "data_format (-data_format [0<nchw>|1<nhwc>])");
+  print_ints(&opts.engine_index, 1, "engine_index (-engine_index)");
 }
 
 std::string CudnnNumericalNoteToString(cudnnBackendNumericalNote_t status) {

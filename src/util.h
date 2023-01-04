@@ -128,6 +128,30 @@ struct MatMulOpts {
   }
 };
 
+struct ResampleOpts {
+  int64_t num_dims = 3;
+  int64_t input_dims[5];
+  int64_t output_dims[5];
+  int64_t input_strides[5];
+  int64_t output_strides[5];
+  int64_t paddings[3];
+  int64_t strides[3];
+  int64_t window_sizes[3];
+  int64_t data_type;
+  int64_t data_format;
+  int64_t graph_index;
+  int64_t engine_index;
+
+  int64_t input_size() {
+    return std::accumulate(input_dims, input_dims + num_dims + 2, 1lu,
+                           std::multiplies<int64_t>());
+  }
+  int64_t output_size() {
+    return std::accumulate(output_dims, output_dims + num_dims + 2, 1lu,
+                           std::multiplies<int64_t>());
+  }
+};
+
 bool IsPrintAll();
 
 ConvOpts ParseConvOpts(int argc, char** argv);
@@ -135,6 +159,9 @@ void PrintConvOpts(ConvOpts& opts);
 
 MatMulOpts ParseMatMulOpts(int argc, char** argv);
 void PrintMatMulOpts(MatMulOpts& opts);
+
+ResampleOpts ParseResampleOpts(int argc, char** argv);
+void PrintResampleOpts(ResampleOpts& opts);
 
 std::string CudnnBehaviorNoteToString(cudnnBackendBehaviorNote_t status);
 std::string CudnnNumericalNoteToString(cudnnBackendNumericalNote_t status);
