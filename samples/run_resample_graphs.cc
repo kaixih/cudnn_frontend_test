@@ -51,13 +51,9 @@ int main(int argc, char** argv) {
   void* x_ptr;
   void* y_ptr;
   void* idx_ptr;
-  void* dx_ptr;
-  void* dy_ptr;
 
   init_fn(&x_ptr, opts.input_size(), InitRandoms);
   init_fn(&y_ptr, opts.output_size(), InitRandoms);
-  init_fn(&dx_ptr, opts.input_size(), InitRandoms);
-  init_fn(&dy_ptr, opts.output_size(), InitRandoms);
   // Index tensor uses int8 dtype.
   AllocTensorWithInitValues<char>(&idx_ptr, opts.output_size(), InitOnes);
   checkCUDA(cudaDeviceSynchronize());
@@ -66,7 +62,12 @@ int main(int argc, char** argv) {
 
   bool print_on = IsPrintAll();
   if (print_on) {
-    print_fn(x_ptr, opts.input_size(), "### input:");
+    if (graph_type == GraphType::AvgPoolFwd ||
+        graph_type == GraphType::MaxPoolFwd) {
+      print_fn(x_ptr, opts.input_size(), "### input (x):");
+    } else {
+      print_fn(y_ptr, opts.output_size(), "### input (dy):");
+    }
     if (graph_type == GraphType::MaxPoolBwd) {
       PrintTensor<char>(idx_ptr, opts.output_size(), "### index:");
     }
@@ -82,7 +83,7 @@ int main(int argc, char** argv) {
     case GraphType::AvgPoolBwd: {
       int64_t uids[] = {'x', 'y'};
       auto launcher = LaunchOpRunner<void*, void*>();
-      launcher(cudnn, plan_desc, workspace_ptr, uids, dx_ptr, dy_ptr);
+      launcher(cudnn, plan_desc, workspace_ptr, uids, x_ptr, y_ptr);
       break;
     }
     case GraphType::MaxPoolFwd: {
@@ -91,7 +92,12 @@ int main(int argc, char** argv) {
       launcher(cudnn, plan_desc, workspace_ptr, uids, x_ptr, y_ptr, idx_ptr);
       break;
     }
-    case GraphType::MaxPoolBwd:
+    case GraphType::MaxPoolBwd: {
+      int64_t uids[] = {'x', 'y', 'i'};
+      auto launcher = LaunchOpRunner<void*, void*, void*>();
+      launcher(cudnn, plan_desc, workspace_ptr, uids, x_ptr, y_ptr, idx_ptr);
+      break;
+    }
     default: {
       printf(RED "!!! Unsupported graph index: %d\n" RESET, graph_index);
       std::exit(EXIT_FAILURE);
@@ -100,7 +106,13 @@ int main(int argc, char** argv) {
 
   checkCUDA(cudaDeviceSynchronize());
   if (print_on) {
-    print_fn(y_ptr, opts.output_size(), "### output:");
+    if (graph_type == GraphType::AvgPoolFwd ||
+        graph_type == GraphType::MaxPoolFwd) {
+      print_fn(y_ptr, opts.output_size(), "### output (y):");
+    } else {
+      print_fn(x_ptr, opts.input_size(), "### output (dx):");
+    }
+
     if (graph_type == GraphType::MaxPoolFwd) {
       PrintTensor<char>(idx_ptr, opts.output_size(), "### index:");
     }

@@ -121,6 +121,52 @@ GetMaxPoolFwdGraph(ResampleOpts& opts, cudnnHandle_t& cudnn) {
   // clang-format on
   return CreateOpGraph(cudnn, nodes);
 }
+
+std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
+GetMaxPoolBwdGraph(ResampleOpts& opts, cudnnHandle_t& cudnn) {
+  ASSIGN_OR_RETURN(auto tensor_dx,
+                   CreateCudnnTensor(opts.input_dims, opts.input_strides,
+                                     opts.num_dims + 2, 'x', opts.data_type),
+                   "Failed to build tensor x");
+
+  ASSIGN_OR_RETURN(auto tensor_dy,
+                   CreateCudnnTensor(opts.output_dims, opts.output_strides,
+                                     opts.num_dims + 2, 'y', opts.data_type),
+                   "Failed to build tensor y");
+
+  ASSIGN_OR_RETURN(auto tensor_idx,
+                   CreateCudnnTensor(opts.output_dims, opts.output_strides,
+                                     opts.num_dims + 2, 'i', /*INT8*/2),
+                   "Failed to build tensor idx");
+
+
+  auto resample_mode = CUDNN_RESAMPLE_MAXPOOL;
+  int resample_dim = opts.num_dims;
+  auto compute_type = GetConvAccumulatorCudnnDataType(opts.data_type);
+  auto nan_opt = CUDNN_PROPAGATE_NAN;
+  auto padding_mode = CUDNN_NEG_INF_PAD;
+
+  auto pool_desc = cudnn_frontend::ResampleDescBuilder()
+                       .setComputeType(compute_type)
+                       .setNanPropagation(nan_opt)
+                       .setResampleMode(resample_mode)
+                       .setPaddingMode(padding_mode)
+                       .setSpatialDim(resample_dim, opts.window_sizes)
+                       .setSpatialStride(resample_dim, opts.strides)
+                       .setPrePadding(resample_dim, opts.paddings)
+                       .setPostPadding(resample_dim, opts.paddings)
+                       .build();
+  RETURN_MSG_IF_CUDNN_ERROR(pool_desc);
+
+  // clang-format off
+  std::vector<Node> nodes = {
+      {"resample_bwd", "resample_bwd", compute_type, &pool_desc, {1., 0.},
+       /*ports=*/{{"dx", &tensor_dx}, {"dy", &tensor_dy},
+                  {"idx", &tensor_idx}}}};
+  // clang-format on
+  return CreateOpGraph(cudnn, nodes);
+}
+
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>> GetConvFwdGraph(
     ConvOpts& opts, cudnnHandle_t& cudnn) {
   ASSIGN_OR_RETURN(auto tensor_x,
@@ -874,6 +920,7 @@ std::optional<ResampleGraphBuilderFnPtr> GetResampleGraphBuilderByIndex(
     case GraphType::MaxPoolFwd:
       return GetMaxPoolFwdGraph;
     case GraphType::MaxPoolBwd:
+      return GetMaxPoolBwdGraph;
     default:
       printf(RED "!!! Unsupported conv graph index: %d\n" RESET, graph_index);
       return {};
