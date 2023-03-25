@@ -44,9 +44,9 @@ enum class GraphType {
   ConvBn = 7,
 
   MatMul = 100,
-  MatMulBiasTanh = 102,
-  MatMulBiasSigmoid = 103,
-  MatMulBiasGeluExact = 104
+  MatMulBiasTanh = 101,
+  MatMulBiasSigmoid = 102,
+  MatMulBiasGeluExact = 103,
 
   AvgPoolFwd = 200,
   AvgPoolBwd = 201,
