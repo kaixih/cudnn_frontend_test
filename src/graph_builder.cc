@@ -99,7 +99,7 @@ GetMaxPoolFwdGraph(ResampleOpts& opts, cudnnHandle_t& cudnn) {
   auto resample_mode = CUDNN_RESAMPLE_MAXPOOL;
   int resample_dim = opts.num_dims;
   auto compute_type = GetConvAccumulatorCudnnDataType(opts.data_type);
-  auto nan_opt = CUDNN_PROPAGATE_NAN;
+  auto nan_opt = CUDNN_NOT_PROPAGATE_NAN;
   auto padding_mode = CUDNN_NEG_INF_PAD;
 
   auto pool_desc = cudnn_frontend::ResampleDescBuilder()

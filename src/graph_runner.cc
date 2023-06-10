@@ -1,6 +1,7 @@
 #include "graph_runner.h"
 
 #include <sys/time.h>
+#include <optional>
 
 namespace {
 uint64_t CpuTimer() {
