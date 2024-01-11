@@ -68,6 +68,12 @@ int main(int argc, char** argv) {
 
   auto graph_type = static_cast<GraphType>(graph_index);
   switch (graph_type) {
+    case GraphType::MatMul: {
+      int64_t uids[] = {'a', 'b', 'c'};
+      auto launcher = LaunchOpRunner<void*, void*, void*>();
+      launcher(cudnn, plan_desc, workspace_ptr, uids, a_ptr, b_ptr, c_ptr);
+      break;
+    }
     case GraphType::MatMulBiasTanh:
     case GraphType::MatMulBiasSigmoid:
     case GraphType::MatMulBiasGeluExact: {
