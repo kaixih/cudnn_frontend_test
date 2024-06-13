@@ -662,6 +662,39 @@ GetConvBn(ConvOpts& opts, cudnnHandle_t& cudnn) {
 }
 
 std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
+GetMatMulGraph(MatMulOpts& opts, cudnnHandle_t& cudnn) {
+  ASSIGN_OR_RETURN(auto tensor_a,
+                   CreateCudnnTensor(opts.a_dims, opts.a_strides, opts.num_dims,
+                                     'a', opts.data_type),
+                   "Failed to build tensor a");
+
+  ASSIGN_OR_RETURN(auto tensor_b,
+                   CreateCudnnTensor(opts.b_dims, opts.b_strides, opts.num_dims,
+                                     'b', opts.data_type),
+                   "Failed to build tensor b");
+
+  ASSIGN_OR_RETURN(auto tensor_c,
+                   CreateCudnnTensor(opts.c_dims, opts.c_strides, opts.num_dims,
+                                     'c', opts.data_type),
+                   "Failed to build tensor c");
+
+  auto accumulator_type = GetConvAccumulatorCudnnDataType(opts.data_type);
+
+  auto matmul_desc = cudnn_frontend::MatMulDescBuilder()
+                         .setComputeType(accumulator_type)
+                         .build();
+  RETURN_MSG_IF_CUDNN_ERROR(matmul_desc);
+
+  // clang-format off
+  std::vector<Node> nodes = {
+      {"matmul", "matmul", accumulator_type, &matmul_desc, {},
+         {{"a", &tensor_a}, {"b", &tensor_b}, {"c", &tensor_c}}}};
+  // clang-format on
+
+  return CreateOpGraph(cudnn, nodes);
+}
+
+std::optional<std::unique_ptr<cudnn_frontend::OperationGraph>>
 GetMatMulBiasTanhGraph(MatMulOpts& opts, cudnnHandle_t& cudnn) {
   // CUDNN fused operation supports the pattern in the form of
   // MatMul + BiasAdd + Tanh. Therefore, we need to build a graph of the
@@ -841,6 +874,9 @@ void PrintGraphName(int graph_index) {
     case GraphType::ConvBn:
       printf(">>>   graph_name: ConvBn\n");
       break;
+    case GraphType::MatMul:
+      printf(">>>   graph_name: MatMulGraph\n");
+      break;
     case GraphType::MatMulBiasTanh:
       printf(">>>   graph_name: MatMulBiasTanhGraph\n");
       break;
@@ -897,6 +933,8 @@ std::optional<MatMulGraphBuilderFnPtr> GetMatMulGraphBuilderByIndex(
     int graph_index) {
   auto graph_type = static_cast<GraphType>(graph_index);
   switch (graph_type) {
+    case GraphType::MatMul:
+      return GetMatMulGraph;
     case GraphType::MatMulBiasTanh:
       return GetMatMulBiasTanhGraph;
     case GraphType::MatMulBiasSigmoid:

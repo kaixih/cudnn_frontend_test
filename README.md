@@ -43,9 +43,10 @@ enum class GraphType {
   ConvBiasLeakyRelu = 6,
   ConvBn = 7,
 
-  MatMulBiasTanh = 100,
-  MatMulBiasSigmoid = 101,
-  MatMulBiasGeluExact = 102
+  MatMul = 100,
+  MatMulBiasTanh = 101,
+  MatMulBiasSigmoid = 102,
+  MatMulBiasGeluExact = 103,
 
   AvgPoolFwd = 200,
   AvgPoolBwd = 201,
@@ -90,7 +91,7 @@ Execution time(ms): 0.288051
 Similarly, the following example shows a matmul graph of
 `MatMul-Bias-GeluExact`.
 ```
-$ ./run_matmul_graphs.out -a 1,8,16 -b 1,16,32 -bias 1,1,32 -data_type 1 -data_format 1 -engine_index 4 -graph_index 102
+$ ./run_matmul_graphs.out -a 1,8,16 -b 1,16,32 -bias 1,1,32 -data_type 1 -data_format 1 -engine_index 4 -graph_index 103
 >>> Retrieved MatMul specs:
 >>>   num_dims: 3,
 >>>   a_dims (-a): 1, 8, 16,
@@ -105,7 +106,7 @@ $ ./run_matmul_graphs.out -a 1,8,16 -b 1,16,32 -bias 1,1,32 -data_type 1 -data_f
 >>>   transpose_b (-transpose_b): 0,
 >>>   data_type (-data_type [0<fp32>|1<fp16>]): 1,
 >>>   engine_index (-engine_index): 4,
->>>   graph_index (-graph_index <int>(+100 for matmul graphs)): 102
+>>>   graph_index (-graph_index <int>(+100 for matmul graphs)): 103
 >>>   graph_name: MatMulBiasGeluExactGraph
 ...
 Using (4): Matmul_Add_GeluFwd_eng0_k24=5
